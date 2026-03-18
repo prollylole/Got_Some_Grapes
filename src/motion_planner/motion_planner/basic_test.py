@@ -46,7 +46,15 @@ class ObstacleStop(Node):
             self.publisher.publish(twist)
             return
 
-        front = msg.ranges[0]
+        front_ranges = msg.ranges[0:20] + msg.ranges[-20:]
+
+        # FILTER
+        valid = [r for r in front_ranges if 0.05 < r < 3.5]
+
+        if len(valid) == 0:
+            return
+
+        front = min(valid)
 
         if front < 0.15:
             twist.linear.x = 0.0

@@ -64,7 +64,7 @@ class GuiNode(Node):
 
         angle = math.degrees(msg.angle_min + index * msg.angle_increment)
 
-        if closest > 0.15:
+        if closest > 0.25:
             self.ui.lidar.setText(f"Closest Distance: {closest:.2f} m")
             self.ui.direction.setText("No obstacle")
             return
