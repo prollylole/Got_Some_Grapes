@@ -1,0 +1,112 @@
+----------running simulation-------------
+export TURTLEBOT3_MODEL=waffle
+ros2 launch turtlebot3_gazebo turtlebot3_world.launch.py
+
+ros2 run turtlebot3_teleop teleop_keyboard
+
+ros2 launch turtlebot3_bringup rviz2.launch.py
+
+ros2 run turtlebot3_gazebo turtlebot3_drive
+
+
+
+-----------running robot--------------
+ssh ubuntu@192.168.0.2xx
+export ROS_DOMAIN_ID=<your_domain_id>
+
+echo "export ROS_DOMAIN_ID=<your_domain_id>" >> ~/.bashrc
+echo "export TURTLEBOT3_MODEL=waffle_pi" >> ~/.bashrc
+
+ros2 launch turtlebot3_bringup robot.launch.py
+ros2 run camera_ros camera_node --ros-args -p format:=RGB888
+
+------------new terminal---------------
+ssh ubuntu@192.168.0.2xx
+
+export ROS_DOMAIN_ID=30  
+export RMW_IMPLEMENTATION=rmw_fastrtps_cpp  
+ros2 topic list
+
+ros2 run turtlebot3_teleop teleop_keyboard
+
+------------new terminal---------------
+ssh ubuntu@192.168.0.2xx
+
+ros2 topic echo /cmd_vel
+ros2 topic echo /camera/image_raw/compressed
+ros2 topic echo /scan
+
+----------syncing simulation-------------
+teleop in laptop can move turtlebot both in sim and irl
+
+turtlebot3 $ ros2 launch turtlebot3_bringup robot.launch.py
+laptop $ ros2 launch turtlebot3_gazebo empty_world.launch.py
+laptop $ ros2 run turtlebot3_teleop teleop_keyboard
+laptop $ ros2 topic list
+
+
+(teleop calls for sensor data)
+/battery_state
+/camera/camera_info
+/camera/image_raw
+/camera/image_raw/compressed
+/camera/image_raw/compressedDepth
+/camera/image_raw/theora
+/clock
+/cmd_vel
+/imu
+/joint_states
+/magnetic_field
+/odom
+/parameter_events
+/performance_metrics
+/robot_description
+/rosout
+/scan
+/sensor_state
+/tf
+/tf_static
+
+
+laptop $ ros2 launch turtlebot3_bringup rviz2.launch.py
+
+
+
+
+----------running robs2_ws scripts-------------
+laptop $ 
+cd ~/robs2_ws
+colcon build --packages-select motion_planner
+source install/setup.bash
+
+ros2 launch motion_planner basic_test_launch.py
+
+
+----------trying slam-------------
+ros2 launch turtlebot3_bringup rviz2.launch.py
+ros2 launch motion_planner tb3_cartographer_launch.py
+
+
+
+
+
+
+
+
+
+
+SLAM
+roslaunch turtlebot3_slam turtlebot3_slam.launch slam_methods:=gmapping
+run rviz and gazebo
+in rviz change color scheme to costmap
+run teleop
+
+
+when robot is moving it is draggy
+when i start rviz it is away from odom
+rviz keeps printing out OLD_TF_DATA
+couple of message losses
+probably because running rviz, gazebo and bringup make clashes happen
+
+
+

@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>motion_planner</name>
+  <version>0.0.0</version>
+  <description>Motion planning nodes: slam, navigation, route optimizer</description>
+  <maintainer email="claudiawee08@gmail.com">Claudia</maintainer>
+  <license>Apache-2.0</license>
+
+  <!-- build tools for ament_python packages -->
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <build_depend>ament_python</build_depend>
+  <exec_depend>ament_python</exec_depend>
+
+  <!-- core runtime -->
+  <depend>rclpy</depend>
+
+  <!-- messages used by nodes -->
+  <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>sensor_msgs</depend>
+
+  <!-- TF / robot state -->
+  <depend>tf2_ros</depend>
+
+  <!-- Action (nav2 NavigateThroughPoses) -->
+  <depend>nav2_msgs</depend>
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
