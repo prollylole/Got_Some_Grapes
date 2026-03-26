@@ -362,7 +362,7 @@ def main():
             cv2.imshow(f"Frame {i + 1}", annotated_frame)
             cv2.imshow(f"Mask {i + 1}", result["mask"])
 
-            key = cv2.waitKey(0)
+            key = cv2.waitKey(0) # Press any key but Q to move on to the next frame
             if key & 0xFF == ord('q'):
                 break
 
