@@ -17,7 +17,9 @@ export ROS_DOMAIN_ID=<your_domain_id>
 echo "export ROS_DOMAIN_ID=<your_domain_id>" >> ~/.bashrc
 echo "export TURTLEBOT3_MODEL=waffle_pi" >> ~/.bashrc
 
-ros2 launch turtlebot3_bringup robot.launch.py
+printenv | grep ROS
+
+ros2 launch turtlebot3_bringup robot.py.launch
 ros2 run camera_ros camera_node --ros-args -p format:=RGB888
 
 ------------new terminal---------------
@@ -46,6 +48,7 @@ laptop $ ros2 topic list
 
 
 (teleop calls for sensor data)
+(running with gazebo world activates camera)
 /battery_state
 /camera/camera_info
 /camera/image_raw
@@ -83,10 +86,65 @@ ros2 launch motion_planner basic_test_launch.py
 
 
 ----------trying slam-------------
-ros2 launch turtlebot3_bringup rviz2.launch.py
+ros2 launch turtlebot3_bringup robot.launch.py
 ros2 launch motion_planner tb3_cartographer_launch.py
 
+maybe this cartographer instead
+ros2 launch turtlebot3_cartographer cartographer.launch.py
 
+ros2 run nav2_map_server map_saver_cli -f ~/map
+
+
+----------trying navigation-------------
+ros2 launch turtlebot3_bringup robot.launch.py
+
+export TURTLEBOT3_MODEL=waffle
+ros2 launch turtlebot3_navigation2 navigation2.launch.py map:=$HOME/map.yaml
+
+ros2 run turtlebot3_teleop teleop_keyboard
+
+
+----------trying camera-------------
+sync camera data from ssh ubuntu to laptop
+export ROS_DOMAIN_ID=<your_domain_id>
+
+turtlebot3 $ ros2 launch turtlebot3_bringup robot.launch.py
+turtlebot3 $ ros2 run usb_cam usb_cam_node_exe --ros-args -p video_device:=/dev/video0 -p image_width:=640 -p image_height:=480 -p framerate:=30.0 -p pixel_format:=mjpeg2rgb
+
+laptop $ ros2 run rqt_image_view rqt_image_view
+
+
+node list has camera 
+
+/diff_drive_controller
+/hlds_laser_publisher
+/robot_state_publisher
+/rqt_gui_cpp_node_27903
+/rqt_gui_py_node_27903
+/turtlebot3_node
+/usb_cam
+
+topic list
+
+/battery_state
+/camera_info
+/cmd_vel
+/image_raw
+/image_raw/compressed
+/image_raw/compressedDepth
+/image_raw/compressed_mouse_left
+/image_raw/theora
+/imu
+/joint_states
+/magnetic_field
+/odom
+/parameter_events
+/robot_description
+/rosout
+/scan
+/sensor_state
+/tf
+/tf_static
 
 
 
@@ -108,5 +166,17 @@ rviz keeps printing out OLD_TF_DATA
 couple of message losses
 probably because running rviz, gazebo and bringup make clashes happen
 
+NOTE:
+- when run the code of tb3 ROBOTIS, we have the clone of the code in our own laptop. 
+But, the tb3 code setting in ssh pi would be the old version so in that case, 
+we will need to remove '/' from 'base_footprint' in robot.launch.py
+because that is based from the older version of code
+- when we run code, ssh should only run bringup, while the rest of the code logic
+should be from our own laptop and workspace
+- when we use tb3 ROBOTIS cloned code, we should run it under humble
 
+laptop $ git status
+git branch --remote
+git checkout humble
+git pull origin humble
 
