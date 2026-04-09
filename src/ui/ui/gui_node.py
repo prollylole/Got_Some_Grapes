@@ -20,6 +20,9 @@ class GuiNode(Node):
         self.object_pub = self.create_publisher(String, '/selected_objects', 10)
         self.continue_pub = self.create_publisher(Bool, '/continue', 10)
 
+        self.continue_state = False
+        self.ui.continue_btn.setEnabled(True)
+
         # State
         self.selected_objects = []
 
@@ -30,6 +33,7 @@ class GuiNode(Node):
         # Subscribers
         self.create_subscription(LaserScan, '/scan', self.scan_callback, qos)
         self.create_subscription(String, '/robot_status', self.status_callback, 10)
+        self.create_subscription(Bool, '/continue', self.continue_callback, 10)
 
     # ---------------- CONTROL ----------------
     def start_robot(self):
@@ -151,7 +155,22 @@ class GuiNode(Node):
             self.ui.cart_items_layout.addWidget(label)
 
     # ---------------- CONTINUE BUTTON ----------------
+    def continue_callback(self, msg):
+        self.continue_state = msg.data
+
+        if self.continue_state:   # True = busy
+            self.ui.continue_btn.setEnabled(False)
+        else:                     # False = ready
+            self.ui.continue_btn.setEnabled(True)
+
     def continue_robot(self):
+        if self.continue_state:
+            return
+
         msg = Bool()
         msg.data = True
         self.continue_pub.publish(msg)
+
+        # disable immediately
+        self.continue_state = True
+        self.ui.continue_btn.setEnabled(False)

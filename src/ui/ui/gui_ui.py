@@ -165,6 +165,16 @@ class GUI(QWidget):
             background-color: #d63a5f;
         }
                            
+        #start_btn:disabled {
+            background-color: #035f47;   /* darker green */
+            color: #888;
+        }
+
+        #stop_btn:disabled {
+            background-color: #7a1f35;   /* darker red */
+            color: #888;
+        }
+                           
         #continue_btn {
             background-color: #ffd166;
             color: black;
@@ -172,6 +182,11 @@ class GUI(QWidget):
 
         #continue_btn:pressed {
             background-color: #e6b800;
+        }
+                           
+        #continue_btn:disabled {
+            background-color: #b89a3f;
+            color: #666;
         }
         """)
 
