@@ -19,7 +19,9 @@ class GuiNode(Node):
         self.control_pub = self.create_publisher(Bool, '/robot_run', 10)
         self.object_pub = self.create_publisher(String, '/selected_objects', 10)
         self.continue_pub = self.create_publisher(Bool, '/continue', 10)
+        self.mode_pub = self.create_publisher(String, '/mode', 10)
 
+        self.mode = "normal"
         self.continue_state = False
         self.ui.continue_btn.setEnabled(True)
 
@@ -174,3 +176,12 @@ class GuiNode(Node):
         # disable immediately
         self.continue_state = True
         self.ui.continue_btn.setEnabled(False)
+
+    def publish_mode(self, mode):
+        self.mode = mode
+
+        msg = String()
+        msg.data = mode
+        self.mode_pub.publish(msg)
+
+        self.get_logger().info(f"Mode: {mode}")

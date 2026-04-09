@@ -10,6 +10,7 @@ class GUI(QWidget):
         super().__init__()
 
         self.node = None  # will be assigned externally
+        self.mode = "normal"
 
         self.setWindowTitle("TurtleBot Control GUI")
         self.setFixedSize(800, 300)
@@ -114,6 +115,9 @@ class GUI(QWidget):
         container.addStretch()
         container.addLayout(bottom_layout)
 
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.show_global_menu)
+
         self.setLayout(container)
 
         # ---------------- GLOBAL STYLING ----------------
@@ -205,3 +209,32 @@ class GUI(QWidget):
 
         if action == remove_action:
             self.node.remove_object(obj_name, button)
+
+    def show_global_menu(self, pos):
+        widget = self.childAt(pos)
+
+        # Ignore if clicking a button (so button menus still work)
+        from PyQt6.QtWidgets import QPushButton
+        if isinstance(widget, QPushButton):
+            return
+
+        menu = QMenu(self)
+
+        normal_action = menu.addAction("Normal Mode")
+        upsell_action = menu.addAction("Upsell Mode")
+
+        # Show checkmark on current mode
+        normal_action.setCheckable(True)
+        upsell_action.setCheckable(True)
+
+        normal_action.setChecked(self.mode == "normal")
+        upsell_action.setChecked(self.mode == "upsell")
+
+        action = menu.exec(self.mapToGlobal(pos))
+
+        if action == normal_action:
+            self.mode = "normal"
+            self.node.publish_mode("normal")
+        elif action == upsell_action:
+            self.mode = "upsell"
+            self.node.publish_mode("upsell")
