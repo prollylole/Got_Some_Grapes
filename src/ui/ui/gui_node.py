@@ -19,7 +19,7 @@ class GUI(QWidget):
 
         self.setWindowTitle("TurtleBot Control GUI")
 
-        self.setFixedSize(800,200)
+        self.setFixedSize(800,400)
 
         # Status labels
         self.status = QLabel("Status: STOPPED")
@@ -45,8 +45,11 @@ class GUI(QWidget):
         # Start/Stop buttons
         self.start_btn = QPushButton("START")
         self.stop_btn = QPushButton("STOP")
+        self.continue_btn = QPushButton("Next Item")
+
         self.start_btn.setObjectName("start_btn")
         self.stop_btn.setObjectName("stop_btn")
+        self.continue_btn.setObjectName("continue_btn")
 
         main_layout = QGridLayout()
 
@@ -73,10 +76,21 @@ class GUI(QWidget):
         # Bottom buttons span full width
         bottom_layout = QHBoxLayout()
         bottom_layout.addWidget(self.start_btn)
+        bottom_layout.addWidget(self.continue_btn)
         bottom_layout.addWidget(self.stop_btn)
+
+        self.cart_label = QLabel("Current Cart:")
+
+        self.cart_items_layout = QVBoxLayout()
+        self.cart_items_layout.setSpacing(10)
+
+        self.cart_container = QVBoxLayout()
+        self.cart_container.addWidget(self.cart_label)
+        self.cart_container.addLayout(self.cart_items_layout)
 
         container = QVBoxLayout()
         container.addLayout(main_layout)
+        container.addLayout(self.cart_container)
         container.addStretch()  # pushes buttons DOWN
         container.addLayout(bottom_layout)
 
@@ -129,6 +143,15 @@ class GUI(QWidget):
         #stop_btn:pressed {
             background-color: #d63a5f;
         }
+                           
+        #continue_btn {
+            background-color: #ffd166;
+            color: black;
+        }
+
+        #continue_btn:pressed {
+            background-color: #e6b800;
+        }
         """)
 
     def show_context_menu(self, pos, obj_name, button):
@@ -158,6 +181,7 @@ class GuiNode(Node):
         # Publishers
         self.control_pub = self.create_publisher(Bool, '/robot_run', 10)
         self.object_pub = self.create_publisher(String, '/selected_objects', 10)
+        self.continue_pub = self.create_publisher(Bool, '/continue', 10)
 
         # State
         self.selected_objects = []
@@ -243,6 +267,7 @@ class GuiNode(Node):
             return
 
         self.selected_objects.append(obj_name)
+        self.update_cart_display()
 
         msg = String()
         msg.data = ",".join(self.selected_objects)
@@ -257,6 +282,7 @@ class GuiNode(Node):
             return  # only remove if exists
 
         self.selected_objects.remove(obj_name)
+        self.update_cart_display()
 
         msg = String()
         msg.data = ",".join(self.selected_objects)
@@ -266,6 +292,28 @@ class GuiNode(Node):
         button.setText(obj_name.capitalize())
         button.setStyleSheet("background-color: #3a86ff;")
 
+    def update_cart_display(self):
+        # Clear old items
+        while self.ui.cart_items_layout.count():
+            item = self.ui.cart_items_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+
+        # Empty case
+        if not self.selected_objects:
+            self.ui.cart_items_layout.addWidget(QLabel("(empty)"))
+            return
+
+        # Minimal vertical list
+        for obj in self.selected_objects:
+            label = QLabel(obj.capitalize())  # no styling, no padding
+            self.ui.cart_items_layout.addWidget(label)
+
+    def continue_robot(self):
+        msg = Bool()
+        msg.data = True   # or toggle if you want
+        self.continue_pub.publish(msg)
     
 
 def main(args=None):
@@ -281,6 +329,7 @@ def main(args=None):
     # Buttons
     gui.start_btn.clicked.connect(node.start_robot)
     gui.stop_btn.clicked.connect(node.stop_robot)
+    gui.continue_btn.clicked.connect(node.continue_robot)
 
     gui.obj1.clicked.connect(lambda: node.choose_object("apple", gui.obj1))
     gui.obj2.clicked.connect(lambda: node.choose_object("bottle", gui.obj2))
