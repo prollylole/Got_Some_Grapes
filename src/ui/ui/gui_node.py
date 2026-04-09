@@ -7,7 +7,7 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import LaserScan
 from std_msgs.msg import Bool, String
 
-from PyQt6.QtWidgets import QApplication, QWidget, QPushButton, QLabel, QVBoxLayout, QHBoxLayout
+from PyQt6.QtWidgets import QApplication, QGridLayout, QWidget, QPushButton, QLabel, QVBoxLayout, QHBoxLayout, QGridLayout
 
 
 class GUI(QWidget):
@@ -16,6 +16,8 @@ class GUI(QWidget):
         super().__init__()
 
         self.setWindowTitle("TurtleBot Control GUI")
+
+        self.setFixedSize(800,200)
 
         # Status labels
         self.status = QLabel("Status: STOPPED")
@@ -31,6 +33,10 @@ class GUI(QWidget):
         # Start/Stop buttons
         self.start_btn = QPushButton("START")
         self.stop_btn = QPushButton("STOP")
+        self.start_btn.setObjectName("start_btn")
+        self.stop_btn.setObjectName("stop_btn")
+
+        main_layout = QGridLayout()
 
         # LEFT PANEL (robot info)
         left_layout = QVBoxLayout()
@@ -38,30 +44,80 @@ class GUI(QWidget):
         left_layout.addWidget(self.lidar)
         left_layout.addWidget(self.direction)
 
-        # RIGHT PANEL (object selection - TOP RIGHT ✅)
-        right_layout = QVBoxLayout()
-        right_layout.addWidget(QLabel("Select Objects"))
-        right_layout.addWidget(self.obj1)
-        right_layout.addWidget(self.obj2)
-        right_layout.addWidget(self.obj3)
-        right_layout.addWidget(self.obj4)
+        # RIGHT PANEL (object selection)
+        right_layout = QGridLayout()
+        self.obj_label = QLabel("Pick the objects you want: ")
 
-        # TOP SECTION
-        top_layout = QHBoxLayout()
-        top_layout.addLayout(left_layout)
-        top_layout.addLayout(right_layout)
+        right_layout.addWidget(self.obj_label, 0, 0, 1, 2)
+        right_layout.addWidget(self.obj1, 1, 0)
+        right_layout.addWidget(self.obj2, 1, 1)
+        right_layout.addWidget(self.obj3, 2, 0)
+        right_layout.addWidget(self.obj4, 2, 1)
 
-        # BOTTOM SECTION (START/STOP)
+        # Add to grid
+        main_layout.addLayout(left_layout, 0, 0)
+        main_layout.addLayout(right_layout, 0, 1)
+
+        # Bottom buttons span full width
         bottom_layout = QHBoxLayout()
         bottom_layout.addWidget(self.start_btn)
         bottom_layout.addWidget(self.stop_btn)
 
-        # MAIN LAYOUT
-        main_layout = QVBoxLayout()
-        main_layout.addLayout(top_layout)
-        main_layout.addLayout(bottom_layout)
+        container = QVBoxLayout()
+        container.addLayout(main_layout)
+        container.addStretch()  # pushes buttons DOWN
+        container.addLayout(bottom_layout)
 
-        self.setLayout(main_layout)
+        self.setLayout(container)
+
+        self.setStyleSheet("""
+        QWidget {
+            background-color: #1e1e2f;
+            color: white;
+            font-size: 14px;
+        }
+
+        QLabel {
+            font-size: 16px;
+            padding: 5px;
+        }
+
+        QPushButton {
+            background-color: #3a86ff;
+            border-radius: 8px;
+            padding: 8px;
+            font-weight: bold;
+        }
+
+        QPushButton:hover {
+            background-color: #265df2;
+        }
+
+        QPushButton:pressed {
+            background-color: #1d4ed8;
+        }
+
+        QPushButton:disabled {
+            background-color: #555;
+            color: #aaa;
+        }
+
+        #start_btn {
+            background-color: #06d6a0;
+        }
+
+        #stop_btn {
+            background-color: #ef476f;
+        }
+        
+        #start_btn:pressed {
+            background-color: #04b383;
+        }
+
+        #stop_btn:pressed {
+            background-color: #d63a5f;
+        }
+        """)
 
 class GuiNode(Node):
 
@@ -88,9 +144,13 @@ class GuiNode(Node):
     # ---------------- CONTROL ----------------
     def start_robot(self):
         self.publish_control(True)
+        self.ui.start_btn.setEnabled(False)
+        self.ui.stop_btn.setEnabled(True)
 
     def stop_robot(self):
         self.publish_control(False)
+        self.ui.start_btn.setEnabled(True)
+        self.ui.stop_btn.setEnabled(False)
 
     def publish_control(self, state):
         msg = Bool()
