@@ -7,13 +7,15 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import LaserScan
 from std_msgs.msg import Bool, String
 
-from PyQt6.QtWidgets import QApplication, QGridLayout, QWidget, QPushButton, QLabel, QVBoxLayout, QHBoxLayout, QGridLayout
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QApplication, QGridLayout, QWidget, QPushButton, QLabel, QVBoxLayout, QHBoxLayout, QGridLayout, QMenu 
 
 
 class GUI(QWidget):
 
     def __init__(self):
         super().__init__()
+        self.node = None  
 
         self.setWindowTitle("TurtleBot Control GUI")
 
@@ -29,6 +31,16 @@ class GUI(QWidget):
         self.obj2 = QPushButton("Bottle")
         self.obj3 = QPushButton("Cup")
         self.obj4 = QPushButton("Book")
+
+        self.obj1.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.obj2.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.obj3.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.obj4.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+
+        self.obj1.customContextMenuRequested.connect(lambda pos: self.show_context_menu(pos, "apple", self.obj1))
+        self.obj2.customContextMenuRequested.connect(lambda pos: self.show_context_menu(pos, "bottle", self.obj2))
+        self.obj3.customContextMenuRequested.connect(lambda pos: self.show_context_menu(pos, "cup", self.obj3))
+        self.obj4.customContextMenuRequested.connect(lambda pos: self.show_context_menu(pos, "book", self.obj4))
 
         # Start/Stop buttons
         self.start_btn = QPushButton("START")
@@ -118,6 +130,23 @@ class GUI(QWidget):
             background-color: #d63a5f;
         }
         """)
+
+    def show_context_menu(self, pos, obj_name, button):
+        if not self.node:
+            return
+
+        # Only allow removing if already selected
+        if obj_name not in self.node.selected_objects:
+            return
+
+        menu = QMenu(self)
+
+        remove_action = menu.addAction("Remove")
+
+        action = menu.exec(button.mapToGlobal(pos))
+
+        if action == remove_action:
+            self.node.remove_object(obj_name, button)
 
 class GuiNode(Node):
 
@@ -221,7 +250,22 @@ class GuiNode(Node):
 
         # UI update
         button.setText(f"{obj_name} ✓")
-        button.setEnabled(False)
+        button.setStyleSheet("background-color: gray;")
+
+    def remove_object(self, obj_name, button):
+        if obj_name not in self.selected_objects:
+            return  # only remove if exists
+
+        self.selected_objects.remove(obj_name)
+
+        msg = String()
+        msg.data = ",".join(self.selected_objects)
+        self.object_pub.publish(msg)
+
+        # UI reset
+        button.setText(obj_name.capitalize())
+        button.setStyleSheet("background-color: #3a86ff;")
+
     
 
 def main(args=None):
@@ -232,6 +276,7 @@ def main(args=None):
     gui.show()
 
     node = GuiNode(gui)
+    gui.node = node 
 
     # Buttons
     gui.start_btn.clicked.connect(node.start_robot)
