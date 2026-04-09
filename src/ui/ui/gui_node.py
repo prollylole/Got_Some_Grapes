@@ -19,7 +19,7 @@ class GUI(QWidget):
 
         self.setWindowTitle("TurtleBot Control GUI")
 
-        self.setFixedSize(800,400)
+        self.setFixedSize(800,300)
 
         # Status labels
         self.status = QLabel("Status: STOPPED")
@@ -79,14 +79,32 @@ class GUI(QWidget):
         bottom_layout.addWidget(self.continue_btn)
         bottom_layout.addWidget(self.stop_btn)
 
-        self.cart_label = QLabel("Current Cart:")
+        # ---------------- GUI Cart Section ----------------
+        self.cart_frame = QWidget()  # frame to hold the whole cart
+        self.cart_layout = QVBoxLayout()  # layout inside the big rectangle
+        self.cart_layout.setSpacing(5)
 
+        # Label inside the big rectangle
+        self.cart_label = QLabel("Current Cart")
+        self.cart_label.setStyleSheet("font-size:14px; font-weight:bold; background: none; border: none; padding: 0; margin: 0;")
+        self.cart_layout.addWidget(self.cart_label)
+
+        # Layout for items
         self.cart_items_layout = QVBoxLayout()
-        self.cart_items_layout.setSpacing(10)
+        self.cart_items_layout.setSpacing(0)
+        self.cart_layout.addLayout(self.cart_items_layout)
 
+        self.cart_frame.setLayout(self.cart_layout)
+        self.cart_frame.setFixedWidth(150)
+        self.cart_frame.setStyleSheet("""
+            border: 1px solid #888;
+            border-radius: 5px;
+            padding: 5px;
+        """)
+
+        # Add the cart frame to main container
         self.cart_container = QVBoxLayout()
-        self.cart_container.addWidget(self.cart_label)
-        self.cart_container.addLayout(self.cart_items_layout)
+        self.cart_container.addWidget(self.cart_frame)
 
         container = QVBoxLayout()
         container.addLayout(main_layout)
@@ -302,14 +320,17 @@ class GuiNode(Node):
 
         # Empty case
         if not self.selected_objects:
-            self.ui.cart_items_layout.addWidget(QLabel("(empty)"))
+            label = QLabel("(empty)")
+            label.setStyleSheet("font-size:15px; background: none; border: none; padding: 0; margin: 0;")
+            self.ui.cart_items_layout.addWidget(label)
             return
 
-        # Minimal vertical list
+        # Add each selected object as a simple label
         for obj in self.selected_objects:
-            label = QLabel(obj.capitalize())  # no styling, no padding
+            label = QLabel(obj.capitalize())
+            label.setStyleSheet("font-size:15px; background: none; border: none; padding: 0; margin: 0;")
             self.ui.cart_items_layout.addWidget(label)
-
+            
     def continue_robot(self):
         msg = Bool()
         msg.data = True   # or toggle if you want
