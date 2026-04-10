@@ -36,11 +36,11 @@ class ObstacleStop(Node):
         if distance is None:
             return
 
-        if distance < 0.15:
+        if distance < 0.35:
             twist.linear.x = 0.0
-            self.publish_status("OBSTACLE DETECTED")
+            self.publish_status("OBSTACLE DETECTED AT FRONT")
         else:
-            twist.linear.x = 0.1
+            twist.linear.x = 0.2
             self.publish_status("RUNNING")
 
         self.cmd_pub.publish(twist)

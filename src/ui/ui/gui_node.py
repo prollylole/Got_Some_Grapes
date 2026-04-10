@@ -85,7 +85,7 @@ class GuiNode(Node):
     def update_lidar_display(self, distance, angle):
         self.ui.lidar.setText(f"Closest Distance: {distance:.2f} m")
 
-        if distance > 0.25:
+        if distance > 1:
             self.ui.direction.setText("No obstacle")
             return
 

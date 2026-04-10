@@ -31,7 +31,7 @@ def generate_launch_description():
 
     use_sim_time = LaunchConfiguration('use_sim_time', default='true')
     x_pose = LaunchConfiguration('x_pose', default='-1.399425')
-    y_pose = LaunchConfiguration('y_pose', default='-4.169185')
+    y_pose = LaunchConfiguration('y_pose', default='-3.969185')
     z_pose = LaunchConfiguration('z_pose', default='0.007903')  
     roll = LaunchConfiguration('roll', default='-0.000002')
     pitch = LaunchConfiguration('pitch', default='0.006298')
