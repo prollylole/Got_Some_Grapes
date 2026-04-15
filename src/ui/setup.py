@@ -24,7 +24,7 @@ setup(
     },
     entry_points={
     'console_scripts': [
-        'gui_node = ui.gui_node:main',
+        'gui_node = ui.main:main',
     ],
     }
 )
