@@ -121,6 +121,51 @@ class GUI(QWidget):
 
         self.setLayout(container)
 
+        # ---------------- CONTEXT MENU ----------------
+    def show_context_menu(self, pos, obj_name, button):
+        if not self.node:
+            return
+
+        if obj_name not in self.node.selected_objects:
+            return
+
+        menu = QMenu(self)
+        remove_action = menu.addAction("Remove")
+
+        action = menu.exec(button.mapToGlobal(pos))
+
+        if action == remove_action:
+            self.node.remove_object(obj_name, button)
+
+    def show_global_menu(self, pos):
+        widget = self.childAt(pos)
+
+        # Ignore if clicking a button (so button menus still work)
+        from PyQt6.QtWidgets import QPushButton
+        if isinstance(widget, QPushButton):
+            return
+
+        menu = QMenu(self)
+
+        normal_action = menu.addAction("Normal Mode")
+        upsell_action = menu.addAction("Upsell Mode")
+
+        # Show checkmark on current mode
+        normal_action.setCheckable(True)
+        upsell_action.setCheckable(True)
+
+        normal_action.setChecked(self.mode == "normal")
+        upsell_action.setChecked(self.mode == "upsell")
+
+        action = menu.exec(self.mapToGlobal(pos))
+
+        if action == normal_action:
+            self.mode = "normal"
+            self.node.publish_mode("normal")
+        elif action == upsell_action:
+            self.mode = "upsell"
+            self.node.publish_mode("upsell")
+
         # ---------------- GLOBAL STYLING ----------------
         self.setStyleSheet("""
         QWidget {
@@ -194,48 +239,3 @@ class GUI(QWidget):
             color: #666;
         }
         """)
-
-    # ---------------- CONTEXT MENU ----------------
-    def show_context_menu(self, pos, obj_name, button):
-        if not self.node:
-            return
-
-        if obj_name not in self.node.selected_objects:
-            return
-
-        menu = QMenu(self)
-        remove_action = menu.addAction("Remove")
-
-        action = menu.exec(button.mapToGlobal(pos))
-
-        if action == remove_action:
-            self.node.remove_object(obj_name, button)
-
-    def show_global_menu(self, pos):
-        widget = self.childAt(pos)
-
-        # Ignore if clicking a button (so button menus still work)
-        from PyQt6.QtWidgets import QPushButton
-        if isinstance(widget, QPushButton):
-            return
-
-        menu = QMenu(self)
-
-        normal_action = menu.addAction("Normal Mode")
-        upsell_action = menu.addAction("Upsell Mode")
-
-        # Show checkmark on current mode
-        normal_action.setCheckable(True)
-        upsell_action.setCheckable(True)
-
-        normal_action.setChecked(self.mode == "normal")
-        upsell_action.setChecked(self.mode == "upsell")
-
-        action = menu.exec(self.mapToGlobal(pos))
-
-        if action == normal_action:
-            self.mode = "normal"
-            self.node.publish_mode("normal")
-        elif action == upsell_action:
-            self.mode = "upsell"
-            self.node.publish_mode("upsell")

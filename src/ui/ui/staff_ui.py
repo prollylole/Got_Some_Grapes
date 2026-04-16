@@ -6,6 +6,12 @@ from PyQt6.QtCore import Qt, pyqtSignal
 
 
 class StaffGUI(QWidget):
+    """
+    Graphical user interface for staff control panel.
+
+    Provides controls for robot operation, mode selection, camera feed display,
+    and out-of-stock item management.
+    """
     add_stock_item_signal = pyqtSignal(str)
 
     def __init__(self):
@@ -17,10 +23,16 @@ class StaffGUI(QWidget):
         self.setWindowTitle("Staff Control Panel")
         self.setFixedSize(700, 450)
 
-        # ---------------- STATUS ----------------
+        self._setup_ui()
+        self._setup_styles()
+        self._connect_signals()
+
+    def _setup_ui(self):
+        """Set up the user interface components."""
+        # Status label
         self.status = QLabel("Status: STOPPED")
 
-        # ---------------- CAMERA ----------------
+        # Camera frame
         self.camera_frame = QWidget()
         self.camera_layout = QVBoxLayout()
         self.camera_layout.setSpacing(5)
@@ -43,20 +55,18 @@ class StaffGUI(QWidget):
             padding: 5px;
         """)
 
-        # ---------------- OUT OF STOCK LIST (LIKE CART) ----------------
+        # Out of stock list frame
         self.stock_frame = QWidget()
         self.stock_layout = QVBoxLayout()
         self.stock_layout.setSpacing(5)
 
-        # Heading inside the rectangle
         self.stock_label = QLabel("Out of Stock List")
         self.stock_label.setStyleSheet(
             "font-size:14px; font-weight:bold; background: none; "
-            "border: none; padding: 0; margin: 0 0 8px 0;" "padding: 0;"
+            "border: none; padding: 0; margin: 0 0 8px 0;"
         )
         self.stock_layout.addWidget(self.stock_label)
 
-        # Layout for items
         self.stock_items_layout = QVBoxLayout()
         self.stock_items_layout.setSpacing(0)
         self.stock_items_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
@@ -70,7 +80,7 @@ class StaffGUI(QWidget):
             padding: 5px;
         """)
 
-        # ---------------- MODE SELECTOR ----------------
+        # Mode selector
         self.mode_label = QLabel("Mode")
 
         self.normal_btn = QPushButton("Normal")
@@ -83,23 +93,30 @@ class StaffGUI(QWidget):
         mode_layout.addWidget(self.normal_btn)
         mode_layout.addWidget(self.upsell_btn)
 
-        # ---------------- CONTROL BUTTONS ----------------
+        # Control buttons
         self.start_btn = QPushButton("START")
         self.stop_btn = QPushButton("STOP")
 
         self.start_btn.setObjectName("start_btn")
         self.stop_btn.setObjectName("stop_btn")
 
+        # Make mode buttons toggleable
+        self.normal_btn.setCheckable(True)
+        self.upsell_btn.setCheckable(True)
+
+        self.normal_btn.setChecked(True)
+        self.stop_btn.setEnabled(False)
+
         control_layout = QHBoxLayout()
         control_layout.addWidget(self.start_btn)
         control_layout.addWidget(self.stop_btn)
 
-        # ---------------- TOP (camera + stock) ----------------
+        # Top layout (camera + stock)
         top_layout = QHBoxLayout()
         top_layout.addWidget(self.camera_frame)
         top_layout.addWidget(self.stock_frame)
 
-        # ---------------- MAIN ----------------
+        # Main layout
         main_layout = QVBoxLayout()
         main_layout.addWidget(self.mode_label)
         main_layout.addLayout(mode_layout)
@@ -110,7 +127,52 @@ class StaffGUI(QWidget):
 
         self.setLayout(main_layout)
 
-        # ---------------- STYLE ----------------
+    def _connect_signals(self):
+        """Connect signals to slots."""
+        self.add_stock_item_signal.connect(self.add_stock_item)
+
+    def update_run_buttons(self, running: bool):
+        """Update the enabled state of start/stop buttons based on running state."""
+        self.start_btn.setEnabled(not running)
+        self.stop_btn.setEnabled(running)
+
+    def add_stock_item(self, item):
+        """Add an out-of-stock item to the list."""
+        button = QPushButton(f"• {item.capitalize()}")
+        button.setObjectName("stock_item")
+        button.setProperty("stock_item", item)
+        button.setFlat(True)
+        button.setCursor(Qt.CursorShape.PointingHandCursor)
+        button.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        button.customContextMenuRequested.connect(
+            lambda pos, btn=button: self.show_stock_item_menu(pos, btn)
+        )
+        button.setStyleSheet(
+            "font-size: 14px;"
+            "color: white;"
+            "background: none;"
+            "border: none;"
+            "text-align: left;"
+            "margin: 0;"
+            "padding: 4px 6px;"
+        )
+        self.stock_items_layout.addWidget(button)
+
+    def show_stock_item_menu(self, pos, button):
+        """Show context menu for stock item."""
+        menu = QMenu(self)
+        stocked_action = menu.addAction("Stocked")
+        action = menu.exec(button.mapToGlobal(pos))
+        if action == stocked_action:
+            self.remove_stock_item(button)
+
+    def remove_stock_item(self, button):
+        """Remove an out-of-stock item from the list."""
+        self.stock_items_layout.removeWidget(button)
+        button.deleteLater()
+    
+    def _setup_styles(self):
+        """Set up the stylesheet for the GUI."""
         self.setStyleSheet("""
         QWidget {
             background-color: #1e1e2f;
@@ -194,55 +256,3 @@ class StaffGUI(QWidget):
         }
         """)
 
-        # Make mode buttons toggleable
-        self.normal_btn.setCheckable(True)
-        self.upsell_btn.setCheckable(True)
-
-        self.normal_btn.setChecked(True)
-        self.stop_btn.setEnabled(False)
-
-        # connect signal
-        self.add_stock_item_signal.connect(self.add_stock_item)
-
-    def update_run_buttons(self, running: bool):
-        self.start_btn.setEnabled(not running)
-        self.stop_btn.setEnabled(running)
-
-    def add_stock_item(self, item):
-        button = QPushButton(f"• {item.capitalize()}")
-        button.setObjectName("stock_item")
-        button.setProperty("stock_item", item)
-        button.setFlat(True)
-        button.setCursor(Qt.CursorShape.PointingHandCursor)
-        button.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        button.customContextMenuRequested.connect(
-            lambda pos, btn=button: self.show_stock_item_menu(pos, btn)
-        )
-        button.setStyleSheet(
-            "font-size: 14px;"
-            "color: white;"
-            "background: none;"
-            "border: none;"
-            "text-align: left;"
-            "margin: 0;"
-            "padding: 4px 6px;"
-        )
-        self.stock_items_layout.addWidget(button)
-
-    def show_stock_item_menu(self, pos, label):
-        menu = QMenu(self)
-        stocked_action = menu.addAction("Stocked")
-        action = menu.exec(label.mapToGlobal(pos))
-        if action == stocked_action:
-            self.remove_stock_item(label)
-
-    def remove_stock_item(self, label):
-        item = label.property("stock_item")
-        if self.node and hasattr(self.node, "logged_items"):
-            try:
-                self.node.logged_items.remove(item)
-            except ValueError:
-                pass
-
-        self.stock_items_layout.removeWidget(label)
-        label.deleteLater()

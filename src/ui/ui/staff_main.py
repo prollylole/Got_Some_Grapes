@@ -9,6 +9,12 @@ from ui.staff_node import StaffNode
 
 
 def main(args=None):
+    """
+    Main entry point for the staff control application.
+
+    Initializes ROS2, creates the GUI and ROS node, connects signals,
+    and starts the ROS spin loop in a separate thread.
+    """
     rclpy.init(args=args)
 
     app = QApplication(sys.argv)
