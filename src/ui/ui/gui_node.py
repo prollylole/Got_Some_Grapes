@@ -33,6 +33,7 @@ class GuiNode(Node):
         qos.reliability = ReliabilityPolicy.BEST_EFFORT
 
         # Subscribers
+        self.create_subscription(Bool, '/robot_run', self.robot_run_callback, 10)
         self.create_subscription(LaserScan, '/scan', self.scan_callback, qos)
         self.create_subscription(String, '/robot_status', self.status_callback, 10)
         self.create_subscription(Bool, '/continue', self.continue_callback, 10)
@@ -40,13 +41,18 @@ class GuiNode(Node):
     # ---------------- CONTROL ----------------
     def start_robot(self):
         self.publish_control(True)
-        self.ui.start_btn.setEnabled(False)
-        self.ui.stop_btn.setEnabled(True)
+        self.update_run_buttons(True)
 
     def stop_robot(self):
         self.publish_control(False)
-        self.ui.start_btn.setEnabled(True)
-        self.ui.stop_btn.setEnabled(False)
+        self.update_run_buttons(False)
+
+    def robot_run_callback(self, msg):
+        self.update_run_buttons(msg.data)
+
+    def update_run_buttons(self, running: bool):
+        self.ui.start_btn.setEnabled(not running)
+        self.ui.stop_btn.setEnabled(running)
 
     def publish_control(self, state):
         msg = Bool()

@@ -52,6 +52,7 @@ class GUI(QWidget):
         self.start_btn.setObjectName("start_btn")
         self.stop_btn.setObjectName("stop_btn")
         self.continue_btn.setObjectName("continue_btn")
+        self.stop_btn.setEnabled(False)
 
         # ---------------- MAIN LAYOUT ----------------
         main_layout = QGridLayout()

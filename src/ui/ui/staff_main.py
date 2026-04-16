@@ -17,6 +17,7 @@ def main(args=None):
     gui.show()
 
     node = StaffNode(gui)
+    gui.node = node
 
     gui.start_btn.clicked.connect(node.start_robot)
     gui.stop_btn.clicked.connect(node.stop_robot)

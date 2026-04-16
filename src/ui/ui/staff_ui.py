@@ -59,6 +59,7 @@ class StaffGUI(QWidget):
         # Layout for items
         self.stock_items_layout = QVBoxLayout()
         self.stock_items_layout.setSpacing(0)
+        self.stock_items_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.stock_layout.addLayout(self.stock_items_layout)
 
         self.stock_frame.setLayout(self.stock_layout)
@@ -137,12 +138,50 @@ class StaffGUI(QWidget):
             background-color: #1d4ed8;
         }
 
+        QPushButton:disabled {
+            background-color: #555;
+            color: #aaa;
+        }
+
+        QPushButton#stock_item {
+            background: none;
+            border: none;
+            color: white;
+            text-align: left;
+        }
+
+        QPushButton#stock_item:hover {
+            background-color: rgba(255,255,255,0.08);
+        }
+
+        QPushButton#stock_item:pressed {
+            background-color: rgba(255,255,255,0.16);
+        }
+
         #start_btn {
             background-color: #06d6a0;
         }
 
+        #start_btn:pressed {
+            background-color: #04b383;
+        }
+
+        #start_btn:disabled {
+            background-color: #035f47;
+            color: #888;
+        }
+
         #stop_btn {
             background-color: #ef476f;
+        }
+
+        #stop_btn:pressed {
+            background-color: #d63a5f;
+        }
+
+        #stop_btn:disabled {
+            background-color: #7a1f35;
+            color: #888;
         }
 
         #mode_btn {
@@ -160,26 +199,35 @@ class StaffGUI(QWidget):
         self.upsell_btn.setCheckable(True)
 
         self.normal_btn.setChecked(True)
+        self.stop_btn.setEnabled(False)
 
         # connect signal
         self.add_stock_item_signal.connect(self.add_stock_item)
 
+    def update_run_buttons(self, running: bool):
+        self.start_btn.setEnabled(not running)
+        self.stop_btn.setEnabled(running)
+
     def add_stock_item(self, item):
-        label = QLabel(f"• {item.capitalize()}")
-        label.setProperty("stock_item", item)
-        label.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        label.customContextMenuRequested.connect(
-            lambda pos, lbl=label: self.show_stock_item_menu(pos, lbl)
+        button = QPushButton(f"• {item.capitalize()}")
+        button.setObjectName("stock_item")
+        button.setProperty("stock_item", item)
+        button.setFlat(True)
+        button.setCursor(Qt.CursorShape.PointingHandCursor)
+        button.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        button.customContextMenuRequested.connect(
+            lambda pos, btn=button: self.show_stock_item_menu(pos, btn)
         )
-        label.setStyleSheet(
+        button.setStyleSheet(
             "font-size: 14px;"
             "color: white;"
             "background: none;"
             "border: none;"
+            "text-align: left;"
             "margin: 0;"
-            "padding: 0;"
+            "padding: 4px 6px;"
         )
-        self.stock_items_layout.addWidget(label)
+        self.stock_items_layout.addWidget(button)
 
     def show_stock_item_menu(self, pos, label):
         menu = QMenu(self)
