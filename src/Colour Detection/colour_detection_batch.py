@@ -318,7 +318,7 @@ def webcam_frame_source(num_frames):
 # =========================================================
 
 def main():
-    expected_colour = "yellow"   # Change this to test: yellow, green, blue, red
+    expected_colour = "blue"   # Change this to test: yellow, green, blue, red
 
     print(f"Starting batch inspection for expected colour: {expected_colour}")
     print(f"Capturing {NUM_FRAMES} frames...")
