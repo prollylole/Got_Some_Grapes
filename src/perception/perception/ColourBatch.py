@@ -11,6 +11,7 @@ from sensor_msgs.msg import Image
 from std_msgs.msg import Bool, String
 from cv_bridge import CvBridge
 
+from rclpy.qos import qos_profile_sensor_data
 
 # =========================================================
 # CONFIG
@@ -245,9 +246,9 @@ class ColourBatchNode(Node):
 
         self.image_sub = self.create_subscription(
             Image,
-            '/camera/image_raw',
+            '/image_raw',
             self.image_callback,
-            10
+            qos_profile_sensor_data
         )
 
         self.missing_flag_pub = self.create_publisher(
@@ -264,7 +265,7 @@ class ColourBatchNode(Node):
 
         # Printing stuff to terminal 
         self.get_logger().info('One-shot Colour Batch Node started.')
-        self.get_logger().info('Subscribing to: /camera/image_raw')
+        self.get_logger().info('Subscribing to: /image_raw')
         self.get_logger().info(f'Expected colour: {self.expected_colour}') # Don't forget need f to insert values straight to string otehrwise will just print what ever in between apostraphe
         self.get_logger().info(f'Will capture exactly {self.num_frames} frames once.')
 
