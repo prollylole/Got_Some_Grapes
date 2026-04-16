@@ -1,8 +1,8 @@
 from PyQt6.QtWidgets import (
     QWidget, QPushButton, QLabel, QVBoxLayout,
-    QHBoxLayout
+    QHBoxLayout, QMenu
 )
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal
 
 
 class StaffGUI(QWidget):
@@ -166,13 +166,35 @@ class StaffGUI(QWidget):
 
     def add_stock_item(self, item):
         label = QLabel(f"• {item.capitalize()}")
+        label.setProperty("stock_item", item)
+        label.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        label.customContextMenuRequested.connect(
+            lambda pos, lbl=label: self.show_stock_item_menu(pos, lbl)
+        )
         label.setStyleSheet(
-        "font-size: 14px;"
-        "font-weight: bold;"
-        "color: white;"
-        "background: none;"
-        "border: none;"
-        "margin: 0;"
-        "padding: 0;"
+            "font-size: 14px;"
+            "color: white;"
+            "background: none;"
+            "border: none;"
+            "margin: 0;"
+            "padding: 0;"
         )
         self.stock_items_layout.addWidget(label)
+
+    def show_stock_item_menu(self, pos, label):
+        menu = QMenu(self)
+        stocked_action = menu.addAction("Stocked")
+        action = menu.exec(label.mapToGlobal(pos))
+        if action == stocked_action:
+            self.remove_stock_item(label)
+
+    def remove_stock_item(self, label):
+        item = label.property("stock_item")
+        if self.node and hasattr(self.node, "logged_items"):
+            try:
+                self.node.logged_items.remove(item)
+            except ValueError:
+                pass
+
+        self.stock_items_layout.removeWidget(label)
+        label.deleteLater()

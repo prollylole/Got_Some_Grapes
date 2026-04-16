@@ -50,7 +50,11 @@ class StaffNode(Node):
         if not item:
             return
 
-        self.logged_items.append(item)
+        canonical_item = item.lower()
+        if canonical_item in self.logged_items:
+            return
+
+        self.logged_items.append(canonical_item)
         self.ui.add_stock_item_signal.emit(item)
 
     # ---------------- STATUS ----------------
