@@ -36,6 +36,7 @@ class GuiNode(Node):
         self.create_subscription(LaserScan, '/scan', self.scan_callback, qos)
         self.create_subscription(String, '/robot_status', self.status_callback, 10)
         self.create_subscription(Bool, '/continue', self.continue_callback, 10)
+        self.create_subscription(Bool, '/item_availability', self.availability_callback,10)
 
     # ---------------- CONTROL ----------------
     def start_robot(self):
@@ -171,6 +172,7 @@ class GuiNode(Node):
             self.ui.continue_btn.setEnabled(True)
 
     def continue_robot(self):
+        self.ui.availability.setText("Item Status: Please wait...")
         if self.continue_state:
             return
 
@@ -190,3 +192,14 @@ class GuiNode(Node):
         self.mode_pub.publish(msg)
 
         self.get_logger().info(f"Mode: {mode}")
+
+    def availability_callback(self, msg):
+
+        if msg.data == True:
+            self.ui.availability.setText("Item Status: Item available")
+
+        elif msg.data == False:
+            self.ui.availability.setText("Item Status: Not available")
+
+        else:
+            self.ui.availability.setText("Item Status: Please wait...")

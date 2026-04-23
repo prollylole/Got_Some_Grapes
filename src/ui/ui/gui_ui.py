@@ -19,6 +19,7 @@ class GUI(QWidget):
         self.status = QLabel("Status: STOPPED")
         self.lidar = QLabel("Closest Distance: --")
         self.direction = QLabel("Obstacle Direction: --")
+        self.availability = QLabel("Item Status: Please wait...")
 
         # ---------------- OBJECT BUTTONS ----------------
         self.obj1 = QPushButton("Apple")
@@ -72,6 +73,7 @@ class GUI(QWidget):
         right_layout.addWidget(self.obj2, 1, 1)
         right_layout.addWidget(self.obj3, 2, 0)
         right_layout.addWidget(self.obj4, 2, 1)
+        right_layout.addWidget(self.availability)
 
         main_layout.addLayout(left_layout, 0, 0)
         main_layout.addLayout(right_layout, 0, 1)
