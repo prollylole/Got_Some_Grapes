@@ -150,6 +150,27 @@ topic list
 ----------running sim yay-------------
 ros2 launch turtlebot3_sim turtlebot3_world.launch.py
 ros2 launch motion_planner navigation2.launch.py map:=$HOME/map.yaml
+ros2 run motion_planner controller
+
+--one waypoint--
+ros2 topic pub --once /goal_pose geometry_msgs/PoseArray "{header: {frame_id: 'map'}, poses: [{position: {x: 1.0, y: 1.0, z: 0.0}, orientation: {w: 1.0}}]}"
+
+--more waypoints (across aisles)--
+ros2 topic pub --once /waypoints geometry_msgs/PoseArray "{header: {frame_id: 'map'}, poses: [
+  {position: {x: 1.0, y: 6.0, z: 0.0}, orientation: {w: 1.0}},
+  {position: {x: 1.0, y: 1.0, z: 0.0}, orientation: {w: 1.0}},
+  {position: {x: 1.0, y: -5.0, z: 0.0}, orientation: {w: 1.0}},
+  {position: {x: 1.0, y: -10.0, z: 0.0}, orientation: {w: 1.0}}
+]}"
+
+--more waypoints (in 3rd aisle)--
+ros2 topic pub /waypoints geometry_msgs/PoseArray "{header: {frame_id: 'map'}, poses: [
+  {position: {x: 2.0, y: -5.0, z: 0.0}, orientation: {w: 1.0}},
+  {position: {x: 1.0, y: -5.0, z: 0.0}, orientation: {w: 1.0}},
+  {position: {x: -2.0, y: -4.4, z: 0.0}, orientation: {w: 1.0}},
+  {position: {x: -7.0, y: -4.0, z: 0.0}, orientation: {w: 1.0}}
+]}"
+
 
 
 

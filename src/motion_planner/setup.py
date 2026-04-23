@@ -34,10 +34,9 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'slam_node = motion_planner.slam_node:main',
-            'nav_node = motion_planner.nav_node:main',
             'route_optimizer_node = motion_planner.route_optimizer_node:main',
-            'basic_test = motion_planner.basic_test:main',                                              
+            'basic_test = motion_planner.basic_test:main',
+            'controller = motion_planner.controller:main',
         ],
     },
 )
