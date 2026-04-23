@@ -1,9 +1,10 @@
 import cv2
 from rclpy.node import Node
 from std_msgs.msg import Bool, String
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, CompressedImage
 from cv_bridge import CvBridge
 from PyQt6.QtGui import QImage, QPixmap
+import numpy as np
 
 
 class StaffNode(Node):
@@ -21,7 +22,7 @@ class StaffNode(Node):
         self.create_subscription(Bool, '/robot_run', self.robot_run_callback, 10)
         self.create_subscription(String, '/out_of_stock', self.stock_callback, 10)
         self.create_subscription(String, '/robot_status', self.status_callback, 10)
-        self.create_subscription(Image, '/image', self.image_callback, 10)
+        self.create_subscription(CompressedImage, '/camera/image_raw/compressed', self.image_callback, 10)
 
     # ---------------- CONTROL ----------------
     def start_robot(self):
@@ -65,7 +66,8 @@ class StaffNode(Node):
 
     # ---------------- CAMERA ----------------
     def image_callback(self, msg):
-        cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+        np_arr = np.frombuffer(msg.data, np.uint8)
+        cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
         rgb_image = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
 
         h, w, ch = rgb_image.shape
