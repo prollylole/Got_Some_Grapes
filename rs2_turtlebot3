@@ -177,7 +177,7 @@ ros2 topic pub /waypoints geometry_msgs/PoseArray "{header: {frame_id: 'map'}, p
 
 
 SLAM
-roslaunch turtlebot3_slam turtlebot3_slam.launch slam_methods:=gmapping
+roslaunch turtlebot3_slam rosturtlebot3_slam.launch slam_methods:=gmapping
 run rviz and gazebo
 in rviz change color scheme to costmap
 run teleop

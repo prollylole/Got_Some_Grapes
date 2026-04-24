@@ -77,12 +77,12 @@ class Controller(Node):
             10
         )
 
-        self.image_sub = self.create_subscription(
-            Image,
-            '/camera/image',
-            self.image_callback,
-            5
-        )
+        # self.image_sub = self.create_subscription(
+        #     Image,
+        #     '/camera/image',
+        #     self.image_callback,
+        #     5
+        # )
 
         # Publishers
         self.marker_pub = self.create_publisher(MarkerArray, '/visualization_marker', 10)
@@ -125,11 +125,21 @@ class Controller(Node):
 
         dist = self.compute_distance(cur_pos, goal_pos)
 
-        # If within 0.35 meters, consider soft-reached to prevent Nav2 stalling
-        if dist < 0.35:
-            self.get_logger().info(f"Waypoint {self.current_goal_idx + 1} reached manually (tolerance fix, dist={dist:.2f}m). Advancing.")
+        if dist < 5.0:
+            self.get_logger().info(f"Waypoint {self.current_goal_idx + 1} reached manually (dist: {dist:.2f}m < 5.0m threshold).")
+    
+
+        # If within 5.0 meters, forcefully advance
+        if dist < 5.0:
+            self.get_logger().info(f"Waypoint {self.current_goal_idx + 1} reached manually (dist: {dist:.2f}m < 5.0m threshold).")
+            
+            # Formally register this segment's distance as completed
+            if self.current_goal_idx < len(self.segment_distances):
+                self.completed_mission_distance += self.segment_distances[self.current_goal_idx]
+
             self.manual_advance = True 
             self.current_goal_idx += 1
+            self.get_logger().info(f"Moving onto the next goal on index {self.current_goal_idx + 1}")
             self.send_next_waypoint()
             
     def laser_callback(self, msg):
@@ -150,6 +160,7 @@ class Controller(Node):
         dy = a.y - b.y
         return math.sqrt(dx*dx + dy*dy)
 
+    # receives array of waypoints and passes to process_waypoints
     def array_goal_pose_callback(self, msg):
         frame = msg.header.frame_id if msg.header.frame_id else "map"
         self.process_waypoints(msg.poses, frame)
@@ -162,6 +173,7 @@ class Controller(Node):
         waypoints = []
 
         # Reset mission tracking variables
+        # erase waypoints from previous missions
         self.goals.clear()
         self.segment_distances.clear()
         self.total_mission_distance = 0.0
@@ -192,6 +204,7 @@ class Controller(Node):
 
             self.segment_distances.append(seg)
             self.total_mission_distance += seg
+            self.get_logger().info("total mission distance: " + str(self.total_mission_distance))
 
             prev_pose = p 
             have_prev = True 
@@ -213,7 +226,7 @@ class Controller(Node):
         #     return
 
         goal_msg = NavigateToPose.Goal()
-        goal_msg.pose = self.waypoints[self.current_goal_idx + 1]
+        goal_msg.pose = self.waypoints[self.current_goal_idx]
 
         self.get_logger().info(f"Sending NavigateToPose goal for waypoint {self.current_goal_idx + 1}/{len(self.waypoints)}")
 
@@ -244,27 +257,25 @@ class Controller(Node):
 
     def handle_result(self, future):
         result = future.result()
-
+        
+        # We completely ignore Nav2 backend STATUS_SUCCEEDED check for advancing.
+        # Advancing is STRICTLY handled by check_goal_reached_manually().
+        
         if result.status == GoalStatus.STATUS_SUCCEEDED:
-            self.get_logger().info(f"Waypoint {self.current_goal_idx + 1} succeeded.")
-            self.current_goal_idx += 1
-            self.send_next_waypoint()
+            self.get_logger().info("Nav2 reported success, but relying purely on manual distance checker to advance.")
         elif result.status == GoalStatus.STATUS_ABORTED:
-            # When we send a new goal in the manual transition, Nav2 aborts/cancels the active one
             if getattr(self, 'manual_advance', False):
                 self.manual_advance = False
+                self.get_logger().info("Nav2 aborted old goal safely because loop forced the next point.")
             else:
-                self.get_logger().warn("NavigateToPose action aborted")
-                self.goal_set = False
+                self.get_logger().warn("NavigateToPose action aborted by Nav2 core. Waiting for manual 5m check to save mission.")
+                # Removed 'self.goal_set = False' so manual override can still try to save us
         elif result.status == GoalStatus.STATUS_CANCELLED:
             if getattr(self, 'manual_advance', False):
                 self.manual_advance = False
+                self.get_logger().info("Nav2 cancelled old goal safely because loop forced the next point.")
             else:
-                self.get_logger().warn("NavigateToPose action cancelled")
-                self.goal_set = False
-        else:
-            self.get_logger().warn("NavigateToPose action unknown result code")       
-            self.goal_set = False
+                self.get_logger().warn("NavigateToPose action cancelled.")
     
     def publish_goal_markers(self):
         arr = MarkerArray()
@@ -314,9 +325,9 @@ class Controller(Node):
                 arrow.points.append(self.current_pose.position)
                 arrow.points.append(g.position)
                 
-                arrow.scale.x = 0.5
-                arrow.scale.y = 0.5
-                arrow.scale.z = 0.5
+                arrow.scale.x = 5.0
+                arrow.scale.y = 5.0
+                arrow.scale.z = 5.0
                 
                 arrow.color.r = 1.0
                 arrow.color.g = 0.2
@@ -350,7 +361,10 @@ class Controller(Node):
                     current_segment_completed = max(0.0, seg_len - to_goal)
 
             completed = self.completed_mission_distance + current_segment_completed
+            self.get_logger().info(f"Goal {self.current_goal_idx} completed: {completed}")
+            
             progress = (completed / self.total_mission_distance) * 100.0 if self.total_mission_distance > 1e-6 else 0.0
+            self.get_logger().info(f"Progress: {progress}")
 
             progress = max(0.0, min(100.0, progress))
         
