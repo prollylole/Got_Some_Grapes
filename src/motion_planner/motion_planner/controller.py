@@ -125,13 +125,13 @@ class Controller(Node):
 
         dist = self.compute_distance(cur_pos, goal_pos)
 
-        if dist < 5.0:
-            self.get_logger().info(f"Waypoint {self.current_goal_idx + 1} reached manually (dist: {dist:.2f}m < 5.0m threshold).")
+        if dist < 1.0   :
+            self.get_logger().info(f"Waypoint {self.current_goal_idx + 1} reached manually (dist: {dist:.2f}m < 0.6m threshold).")
     
 
-        # If within 5.0 meters, forcefully advance
-        if dist < 5.0:
-            self.get_logger().info(f"Waypoint {self.current_goal_idx + 1} reached manually (dist: {dist:.2f}m < 5.0m threshold).")
+        # If within 1.0 meters, forcefully advance
+        if dist < 1.0:
+            self.get_logger().info(f"Waypoint {self.current_goal_idx + 1} reached manually (dist: {dist:.2f}m < 0.6m threshold).")
             
             # Formally register this segment's distance as completed
             if self.current_goal_idx < len(self.segment_distances):
@@ -216,7 +216,7 @@ class Controller(Node):
             self.send_next_waypoint()
 
     def send_next_waypoint(self):
-        if self.current_goal_idx >= len(self.waypoints):
+        if self.current_goal_idx >= len(self.waypoints)+1:
             self.get_logger().info("All waypoints completed successfully!")
             self.goal_set = False
             return
@@ -258,18 +258,19 @@ class Controller(Node):
     def handle_result(self, future):
         result = future.result()
         
-        # We completely ignore Nav2 backend STATUS_SUCCEEDED check for advancing.
-        # Advancing is STRICTLY handled by check_goal_reached_manually().
-        
         if result.status == GoalStatus.STATUS_SUCCEEDED:
-            self.get_logger().info("Nav2 reported success, but relying purely on manual distance checker to advance.")
+            self.get_logger().info(f"Waypoint {self.current_goal_idx + 1} succeeded organically by Nav2.")
+            if self.current_goal_idx < len(self.segment_distances):
+                self.completed_mission_distance += self.segment_distances[self.current_goal_idx]
+            self.current_goal_idx += 1
+            self.send_next_waypoint()
         elif result.status == GoalStatus.STATUS_ABORTED:
             if getattr(self, 'manual_advance', False):
                 self.manual_advance = False
                 self.get_logger().info("Nav2 aborted old goal safely because loop forced the next point.")
             else:
-                self.get_logger().warn("NavigateToPose action aborted by Nav2 core. Waiting for manual 5m check to save mission.")
-                # Removed 'self.goal_set = False' so manual override can still try to save us
+                self.get_logger().error(f"CRITICAL: Waypoint {self.current_goal_idx + 1} was completely rejected by Nav2 global planner! It is likely inside a wall or obstacle. Halting mission.")
+                self.goal_set = False
         elif result.status == GoalStatus.STATUS_CANCELLED:
             if getattr(self, 'manual_advance', False):
                 self.manual_advance = False
@@ -355,16 +356,24 @@ class Controller(Node):
             
             if self.current_goal_idx < len(self.goals):
                 seg_len = self.segment_distances[self.current_goal_idx]
+                
+                # Dynamic Odom Fix: If first segment was tracked as 0 because of missing boot-up Odometry, fix it here and now!
+                if seg_len <= 1e-6 and self.current_goal_idx == 0 and not math.isnan(cur.position.x):
+                    seg_len = self.compute_distance(cur.position, self.goals[0].position)
+                    self.segment_distances[0] = seg_len
+                    self.total_mission_distance += seg_len
+                    self.get_logger().info(f"Boot-up tracking fixed. First segment mapped manually as {seg_len:.2f}m")
+
                 to_goal = self.compute_distance(cur.position, self.goals[self.current_goal_idx].position)
 
                 if seg_len > 1e-6:
                     current_segment_completed = max(0.0, seg_len - to_goal)
 
             completed = self.completed_mission_distance + current_segment_completed
-            self.get_logger().info(f"Goal {self.current_goal_idx} completed: {completed}")
+            self.get_logger().info(f"Goal {self.current_goal_idx} distance travelled: {completed}")
             
             progress = (completed / self.total_mission_distance) * 100.0 if self.total_mission_distance > 1e-6 else 0.0
-            self.get_logger().info(f"Progress: {progress}")
+            self.get_logger().info(f"Progress of mission: {progress}")
 
             progress = max(0.0, min(100.0, progress))
         

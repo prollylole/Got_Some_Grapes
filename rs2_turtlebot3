@@ -163,14 +163,30 @@ ros2 topic pub --once /waypoints geometry_msgs/PoseArray "{header: {frame_id: 'm
   {position: {x: 1.0, y: -10.0, z: 0.0}, orientation: {w: 1.0}}
 ]}"
 
---more waypoints (in 3rd aisle)--
-ros2 topic pub /waypoints geometry_msgs/PoseArray "{header: {frame_id: 'map'}, poses: [
-  {position: {x: 2.0, y: -5.0, z: 0.0}, orientation: {w: 1.0}},
-  {position: {x: 1.0, y: -5.0, z: 0.0}, orientation: {w: 1.0}},
-  {position: {x: -2.0, y: -4.4, z: 0.0}, orientation: {w: 1.0}},
-  {position: {x: -7.0, y: -4.0, z: 0.0}, orientation: {w: 1.0}}
+--more waypoints--
+ros2 topic pub --once /waypoints geometry_msgs/PoseArray "{header: {frame_id: 'map'}, poses: [
+  {position: {x: -4.62, y: 4.42, z: 0.0}, orientation: {w: 1.0}},
+  {position: {x: 1.72, y: 3.77, z: 0.0}, orientation: {w: 1.0}},
+  {position: {x: 1.32, y: -0.759, z: 0.0}, orientation: {w: 1.0}},
+  {position: {x: -4.6, y: 0.0, z: 0.0}, orientation: {w: 1.0}},
+  {position: {x: -5.71, y: -5.19, z: 0.0}, orientation: {w: 1.0}},
+  {position: {x: 0.72, y: -5.84, z: 0.0}, orientation: {w: 1.0}}
 ]}"
 
+ros2 topic pub --once /waypoints geometry_msgs/PoseArray "{header: {frame_id: 'map'}, poses: [
+  {position: {x: 1.0, y: 1.0, z: 0.0}, orientation: {w: 1.0}},
+  {position: {x: 1.0, y: -10.0, z: 0.0}, orientation: {w: 1.0}}
+]}"
+
+ros2 topic pub --once /waypoints geometry_msgs/PoseArray "{header: {frame_id: 'map'}, poses: [
+  {position: {x: 0.72, y: -5.84, z: 0.0}, orientation: {w: 1.0}},
+  {position: {x: -5.71, y: -5.19, z: 0.0}, orientation: {w: 1.0}}
+]}"
+
+ros2 topic pub --once /waypoints geometry_msgs/PoseArray "{header: {frame_id: 'map'}, poses: [
+  {position: {x: -5.71, y: -5.19, z: 0.0}, orientation: {w: 1.0}},
+  {position: {x: 0.72, y: -5.84, z: 0.0}, orientation: {w: 1.0}}
+]}"
 
 
 
@@ -202,4 +218,9 @@ laptop $ git status
 git branch --remote
 git checkout humble
 git pull origin humble
+
+some waypoints got aborted even tho it is reachable
+if i set an array of 4 waypoints, it only reach 3 even tho all waypoints are reachable 
+if i set an array of 2 waypoints (same waypoints), it reaches 2 but
+i have to tweak the tolerance big enough to be reachable, if it's small, the next waypoint is aborted
 
