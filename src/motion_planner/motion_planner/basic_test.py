@@ -10,69 +10,58 @@ class ObstacleStop(Node):
     def __init__(self):
         super().__init__('obstacle_stop')
 
-        self.publisher = self.create_publisher(Twist, 'cmd_vel', 10)
+        self.cmd_pub = self.create_publisher(Twist, 'cmd_vel', 10)
         self.status_pub = self.create_publisher(String, '/robot_status', 10)
+
+        self.running = False
 
         qos = QoSProfile(depth=10)
         qos.reliability = ReliabilityPolicy.BEST_EFFORT
 
-        self.scan_sub = self.create_subscription(
-        LaserScan,
-        '/scan',
-        self.scan_callback,
-        qos)
+        self.create_subscription(LaserScan, '/scan', self.scan_callback, qos)
+        self.create_subscription(Bool, '/robot_run', self.control_callback, 10)
 
         self.get_logger().info("Obstacle Stop Started")
 
-        self.running = False
-
-        self.control_sub = self.create_subscription(
-            Bool,
-            '/robot_run',
-            self.control_callback,
-            10
-        )
-
-
     def scan_callback(self, msg):
-
         twist = Twist()
-        status = String()
 
         if not self.running:
-            twist.linear.x = 0.0
-            status.data = "STOPPED"
-            self.status_pub.publish(status)
-            self.publisher.publish(twist)
+            self.publish_status("STOPPED")
+            self.cmd_pub.publish(twist)
             return
 
-        front = msg.ranges[0]
+        distance = self.get_front_distance(msg)
 
-        if front < 0.15:
+        if distance is None:
+            return
+
+        if distance < 0.35:
             twist.linear.x = 0.0
-            status.data = "OBSTACLE DETECTED"
-            self.get_logger().info("STOP - Obstacle")
+            self.publish_status("OBSTACLE DETECTED AT FRONT")
         else:
-            twist.linear.x = 0.1
-            status.data = "RUNNING"
-            self.get_logger().info("MOVE")
+            twist.linear.x = 0.2
+            self.publish_status("RUNNING")
 
-        self.publisher.publish(twist)
-        self.status_pub.publish(status)
+        self.cmd_pub.publish(twist)
+
+    def get_front_distance(self, msg):
+        front_ranges = msg.ranges[0:20] + msg.ranges[-20:]
+        valid = [r for r in front_ranges if 0.05 < r < 3.5]
+
+        if not valid:
+            return None
+
+        return min(valid)
 
     def control_callback(self, msg):
-
         self.running = msg.data
-        status = String()
+        self.publish_status("RUNNING" if self.running else "STOPPED")
 
-        if self.running:
-            status.data = "RUNNING"
-            self.get_logger().info("Robot STARTED")
-        else:
-            status.data = "STOPPED"
-            self.get_logger().info("Robot STOPPED")
-
-        self.status_pub.publish(status)
+    def publish_status(self, text):
+        msg = String()
+        msg.data = text
+        self.status_pub.publish(msg)
 
 
 def main(args=None):
