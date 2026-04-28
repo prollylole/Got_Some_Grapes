@@ -271,7 +271,7 @@ class Controller(Node):
             else:
                 self.get_logger().error(f"CRITICAL: Waypoint {self.current_goal_idx + 1} was completely rejected by Nav2 global planner! It is likely inside a wall or obstacle. Halting mission.")
                 self.goal_set = False
-        elif result.status == GoalStatus.STATUS_CANCELLED:
+        elif result.status == GoalStatus.STATUS_CANCELED:
             if getattr(self, 'manual_advance', False):
                 self.manual_advance = False
                 self.get_logger().info("Nav2 cancelled old goal safely because loop forced the next point.")
