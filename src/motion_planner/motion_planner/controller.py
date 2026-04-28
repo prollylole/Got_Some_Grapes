@@ -13,6 +13,7 @@ from visualization_msgs.msg import MarkerArray, Marker
 from std_msgs.msg import Float64
 from builtin_interfaces.msg import Duration
 from action_msgs.msg import GoalStatus
+from std_msgs.msg import Bool, String
 
 from nav2_msgs.action import NavigateToPose
 import cv_bridge
@@ -77,6 +78,12 @@ class Controller(Node):
             10
         )
 
+        self.continue_sub = self.create_subscription(
+            Bool, 
+            '/continue', 
+            self.continue_callback, 
+            10)
+
         # self.image_sub = self.create_subscription(
         #     Image,
         #     '/camera/image',
@@ -88,6 +95,10 @@ class Controller(Node):
         self.marker_pub = self.create_publisher(MarkerArray, '/visualization_marker', 10)
         self.mission_progress_pub = self.create_publisher(Float64, '/mission_progress', 10)
         self.mission_distance_pub = self.create_publisher(Float64, '/mission_distance', 10)
+        self.status_pub = self.create_publisher(String, 'robot_status', 10)
+
+        # continue/pause button 
+        self.waiting_for_continue = False
 
         # Action Client for Nav2
         self.navigate_to_pose_client = ActionClient(
@@ -125,22 +136,23 @@ class Controller(Node):
 
         dist = self.compute_distance(cur_pos, goal_pos)
 
-        if dist < 1.0   :
-            self.get_logger().info(f"Waypoint {self.current_goal_idx + 1} reached manually (dist: {dist:.2f}m < 0.6m threshold).")
-    
-
-        # If within 1.0 meters, forcefully advance
-        if dist < 1.0:
-            self.get_logger().info(f"Waypoint {self.current_goal_idx + 1} reached manually (dist: {dist:.2f}m < 0.6m threshold).")
+        if dist < 1.0 and not self.waiting_for_continue:
+            self.get_logger().info(f"Waypoint {self.current_goal_idx + 1} reached! Pausing robot for Continue button...")
+            
+            # Cancel the active Nav2 driving goal so the robot actually stops moving!
+            if hasattr(self, 'active_goal_handle') and self.active_goal_handle is not None:
+                self.active_goal_handle.cancel_goal_async()
             
             # Formally register this segment's distance as completed
             if self.current_goal_idx < len(self.segment_distances):
                 self.completed_mission_distance += self.segment_distances[self.current_goal_idx]
 
             self.manual_advance = True 
-            self.current_goal_idx += 1
-            self.get_logger().info(f"Moving onto the next goal on index {self.current_goal_idx + 1}")
-            self.send_next_waypoint()
+            self.waiting_for_continue = True 
+            
+            status_msg = String()
+            status_msg.data = f"Arrived at Waypoint {self.current_goal_idx + 1}. Waiting for user to press Continue..."
+            self.status_pub.publish(status_msg)
             
     def laser_callback(self, msg):
         self.last_scan = msg
@@ -148,6 +160,15 @@ class Controller(Node):
 
     def odom_callback(self, msg):
         self.current_pose = msg.pose.pose
+
+    def continue_callback(self, msg):
+        if msg.data == True and self.waiting_for_continue:
+            # The user clicked Continue on the GUI
+            self.get_logger().info("Continue button pressed by user! Moving to the next waypoint.")
+            self.waiting_for_continue = False
+
+            self.current_goal_idx += 1
+            self.send_next_waypoint()
 
     def image_callback(self, msg):
         try:
@@ -246,6 +267,8 @@ class Controller(Node):
             return
 
         self.get_logger().info("NavigateToPose goal accepted by server, waiting for result")
+        
+        self.active_goal_handle = goal_handle
 
         # Wait for the action to complete()
         self.get_result_future = goal_handle.get_result_async()
