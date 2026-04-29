@@ -189,6 +189,9 @@ ros2 topic pub --once /waypoints geometry_msgs/PoseArray "{header: {frame_id: 'm
 ]}"
 
 
+ros2 topic pub /continue std_msgs/msg/Bool "{data: false}" --once
+ros2 run ui gui_node
+
 
 
 

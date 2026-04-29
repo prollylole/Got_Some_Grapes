@@ -99,6 +99,14 @@ class Controller(Node):
 
         # continue/pause button 
         self.waiting_for_continue = False
+        
+        # UI Start/Stop button
+        self.is_running = False
+        self.run_sub = self.create_subscription(
+            Bool, 
+            '/robot_run', 
+            self.robot_run_callback, 
+            10)
 
         # Action Client for Nav2
         self.navigate_to_pose_client = ActionClient(
@@ -160,6 +168,24 @@ class Controller(Node):
 
     def odom_callback(self, msg):
         self.current_pose = msg.pose.pose
+
+    def robot_run_callback(self, msg):
+        run_cmd = msg.data
+        if run_cmd == True and not self.is_running:
+            self.get_logger().info("UI Start button pressed! Resuming navigation.")
+            self.is_running = True
+            
+            # If we have goals loaded and we aren't waiting at a shelf, start driving!
+            if self.goal_set and not self.waiting_for_continue:
+                self.send_next_waypoint()
+                
+        elif run_cmd == False and self.is_running:
+            self.get_logger().info("UI Stop button pressed! Halting robot.")
+            self.is_running = False
+            
+            # Force stop Nav2
+            if hasattr(self, 'active_goal_handle') and self.active_goal_handle is not None:
+                self.active_goal_handle.cancel_goal_async()
 
     def continue_callback(self, msg):
         if msg.data == True and self.waiting_for_continue:
@@ -234,9 +260,15 @@ class Controller(Node):
         self.goal_set = len(self.goals) > 0
         
         if self.goal_set:
-            self.send_next_waypoint()
+            if self.is_running:
+                self.send_next_waypoint()
+            else:
+                self.get_logger().info("Waypoints loaded. Waiting for UI Start button to begin.")
 
     def send_next_waypoint(self):
+        if not self.is_running:
+            return
+
         if self.current_goal_idx >= len(self.waypoints)+1:
             self.get_logger().info("All waypoints completed successfully!")
             self.goal_set = False
@@ -294,7 +326,7 @@ class Controller(Node):
             else:
                 self.get_logger().error(f"CRITICAL: Waypoint {self.current_goal_idx + 1} was completely rejected by Nav2 global planner! It is likely inside a wall or obstacle. Halting mission.")
                 self.goal_set = False
-        elif result.status == GoalStatus.STATUS_CANCELLED:
+        elif result.status == GoalStatus.STATUS_CANCELED:
             if getattr(self, 'manual_advance', False):
                 self.manual_advance = False
                 self.get_logger().info("Nav2 cancelled old goal safely because loop forced the next point.")
