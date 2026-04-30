@@ -2,23 +2,21 @@
 <package format="3">
   <name>perception</name>
   <version>0.0.0</version>
-  <description>Vision nodes: ArUco and AI vision</description>
+  <description>Vision nodes: ArUco, AI vision, and colour detection</description>
+
   <maintainer email="claudiawee08@gmail.com">Claudia</maintainer>
   <license>Apache-2.0</license>
 
-  <buildtool_depend>ament_cmake</buildtool_depend>
-  <build_depend>ament_python</build_depend>
-  <exec_depend>ament_python</exec_depend>
+  <buildtool_depend>ament_python</buildtool_depend>
 
   <depend>rclpy</depend>
   <depend>std_msgs</depend>
   <depend>sensor_msgs</depend>
-  <depend>geometry_msgs</depend> <!-- if publishing cmd_vel or calling back -->
+  <depend>geometry_msgs</depend>
   <depend>cv_bridge</depend>
   <depend>image_transport</depend>
+  <depend>perception_interfaces</depend>
 
-  <!-- If using OpenCV python library, install system package via apt/pip.
-       Use rosdep to pull dependencies where possible. -->
   <export>
     <build_type>ament_python</build_type>
   </export>

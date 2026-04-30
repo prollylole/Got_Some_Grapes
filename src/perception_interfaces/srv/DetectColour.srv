@@ -1,0 +1,8 @@
+string expected_colour
+---
+bool success
+bool colour_present
+bool missing_flag
+string position
+int32 detection_count
+string status
