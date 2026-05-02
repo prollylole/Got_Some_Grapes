@@ -13,7 +13,7 @@ class GUI(QWidget):
         self.mode = "normal"
 
         self.setWindowTitle("TurtleBot Control GUI")
-        self.setFixedSize(800, 300)
+        self.setFixedSize(800, 350)
 
         # ---------------- STATUS LABELS ----------------
         self.status = QLabel("Status: STOPPED")
