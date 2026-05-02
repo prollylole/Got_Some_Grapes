@@ -31,6 +31,8 @@ def main(args=None):
     gui.normal_btn.clicked.connect(lambda: node.set_mode("normal"))
     gui.upsell_btn.clicked.connect(lambda: node.set_mode("upsell"))
 
+    gui.upsell_dropdown.currentTextChanged.connect(node.publish_upsell_product)
+
     Thread(target=rclpy.spin, args=(node,), daemon=True).start()
 
     sys.exit(app.exec())

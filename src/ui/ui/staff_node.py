@@ -17,6 +17,7 @@ class StaffNode(Node):
         # Publishers
         self.control_pub = self.create_publisher(Bool, '/robot_run', 10)
         self.mode_pub = self.create_publisher(String, '/mode', 10)
+        self.upsell_pub = self.create_publisher(String, '/upsell_product', 10)
 
         # Subscribers
         self.create_subscription(Bool, '/robot_run', self.robot_run_callback, 10)
@@ -49,6 +50,9 @@ class StaffNode(Node):
         msg = String()
         msg.data = mode
         self.mode_pub.publish(msg)
+
+        # Update UI
+        self.ui.update_mode_ui(mode)
 
         if mode == "normal":
             self.ui.normal_btn.setChecked(True)
@@ -87,3 +91,8 @@ class StaffNode(Node):
             self.ui.camera_feed.width(),
             self.ui.camera_feed.height()
         ))
+
+    def publish_upsell_product(self, product):
+        msg = String()
+        msg.data = product
+        self.upsell_pub.publish(msg)

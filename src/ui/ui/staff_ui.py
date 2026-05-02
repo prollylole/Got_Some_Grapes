@@ -3,7 +3,7 @@ from PyQt6.QtWidgets import (
     QWidget, QPushButton, QLabel, QVBoxLayout,
     QHBoxLayout, QMenu
 )
-
+from PyQt6.QtWidgets import QComboBox
 
 class StaffGUI(QWidget):
     add_stock_item_signal = pyqtSignal(str)
@@ -15,7 +15,7 @@ class StaffGUI(QWidget):
         self.mode = "normal"
 
         self.setWindowTitle("Staff Control Panel")
-        self.setFixedSize(700, 450)
+        self.setFixedSize(700, 500)
 
         # ---------------- STATUS ----------------
         self.status = QLabel("Status: STOPPED")
@@ -87,6 +87,14 @@ class StaffGUI(QWidget):
             padding: 5px;
         """)
 
+        #dropdown for upsell products
+        self.upsell_label = QLabel("Select Promotion Item")
+        self.upsell_label.setVisible(False)  # hidden by default
+
+        self.upsell_dropdown = QComboBox()
+        self.upsell_dropdown.addItems(["apple", "bottle", "cup", "book"])
+        self.upsell_dropdown.setVisible(False)  # hidden by default
+
         # ---------------- TOP SECTION ----------------
         top_layout = QHBoxLayout()
         top_layout.addWidget(self.camera_frame)
@@ -109,6 +117,8 @@ class StaffGUI(QWidget):
         main_layout = QVBoxLayout()
         main_layout.addWidget(self.mode_label)
         main_layout.addLayout(mode_layout)
+        main_layout.addWidget(self.upsell_label)
+        main_layout.addWidget(self.upsell_dropdown)
         main_layout.addWidget(self.status)
         main_layout.addLayout(top_layout)
         main_layout.addStretch()
@@ -221,3 +231,11 @@ class StaffGUI(QWidget):
     def update_run_buttons(self, running: bool):
         self.start_btn.setEnabled(not running)
         self.stop_btn.setEnabled(running)
+
+    def update_mode_ui(self, mode):
+        if mode == "upsell":
+            self.upsell_dropdown.setVisible(True)
+            self.upsell_label.setVisible(True)
+        else:
+            self.upsell_dropdown.setVisible(False)
+            self.upsell_label.setVisible(False)
