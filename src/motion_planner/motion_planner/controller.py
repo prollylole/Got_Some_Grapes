@@ -96,6 +96,7 @@ class Controller(Node):
         self.mission_progress_pub = self.create_publisher(Float64, '/mission_progress', 10)
         self.mission_distance_pub = self.create_publisher(Float64, '/mission_distance', 10)
         self.status_pub = self.create_publisher(String, 'robot_status', 10)
+        self.trigger_scan_pub = self.create_publisher(Bool, '/trigger_scan', 10)
 
         # continue/pause button 
         self.waiting_for_continue = False
@@ -158,8 +159,12 @@ class Controller(Node):
             self.manual_advance = True 
             self.waiting_for_continue = True 
             
+            scan_msg = Bool()
+            scan_msg.data = True
+            self.trigger_scan_pub.publish(scan_msg)
+            
             status_msg = String()
-            status_msg.data = f"Arrived at Waypoint {self.current_goal_idx + 1}. Waiting for user to press Continue..."
+            status_msg.data = f"Arrived at Waypoint {self.current_goal_idx + 1}. Auto-scanning..."
             self.status_pub.publish(status_msg)
             
     def laser_callback(self, msg):

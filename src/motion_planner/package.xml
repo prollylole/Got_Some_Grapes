@@ -7,7 +7,7 @@
   <license>Apache-2.0</license>
 
   <!-- build tools for ament_python packages -->
-  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_python</buildtool_depend>
   <build_depend>ament_python</build_depend>
   <exec_depend>ament_python</exec_depend>
 

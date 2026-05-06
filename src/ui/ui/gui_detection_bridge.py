@@ -36,8 +36,8 @@ class GuiDetectionBridge(Node):
 
         self.create_subscription(
             Bool,
-            '/continue',
-            self.continue_callback,
+            '/trigger_scan',
+            self.trigger_scan_callback,
             10
         )
 
@@ -66,7 +66,7 @@ class GuiDetectionBridge(Node):
         )
 
         self.get_logger().info('GUI detection bridge started.')
-        self.get_logger().info('Listening to /selected_objects and /continue.')
+        self.get_logger().info('Listening to /selected_objects and /trigger_scan.')
         self.get_logger().info('Calling service /detect_colour.')
 
     def selected_objects_callback(self, msg):
@@ -80,13 +80,13 @@ class GuiDetectionBridge(Node):
             f'Selected objects received: {self.selected_objects}'
         )
 
-    def continue_callback(self, msg):
+    def trigger_scan_callback(self, msg):
         if not msg.data:
             return
 
         if self.check_in_progress:
             self.get_logger().warn(
-                'Detection already in progress. Ignoring duplicate continue signal.'
+                'Detection already in progress. Ignoring duplicate trigger signal.'
             )
             return
 
