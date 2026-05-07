@@ -13,6 +13,7 @@ from visualization_msgs.msg import MarkerArray, Marker
 from std_msgs.msg import Float64
 from builtin_interfaces.msg import Duration
 from action_msgs.msg import GoalStatus
+from std_msgs.msg import Bool, String
 
 from nav2_msgs.action import NavigateToPose
 import cv_bridge
@@ -77,6 +78,26 @@ class Controller(Node):
             10
         )
 
+        self.continue_sub = self.create_subscription(
+            Bool, 
+            '/continue', 
+            self.continue_callback, 
+            10)
+
+        self.robot_run_sub = self.create_subscription(
+            Bool,
+            '/robot_run',
+            self.robot_run_callback,
+            10)
+
+        self.is_running = False
+
+        self.status_pub = self.create_publisher(
+            String, 
+            '/robot_status', 
+            10)
+
+
         # self.image_sub = self.create_subscription(
         #     Image,
         #     '/camera/image',
@@ -88,6 +109,10 @@ class Controller(Node):
         self.marker_pub = self.create_publisher(MarkerArray, '/visualization_marker', 10)
         self.mission_progress_pub = self.create_publisher(Float64, '/mission_progress', 10)
         self.mission_distance_pub = self.create_publisher(Float64, '/mission_distance', 10)
+        self.status_pub = self.create_publisher(String, 'robot_status', 10)
+
+        # continue/pause button 
+        self.waiting_for_continue = False
 
         # Action Client for Nav2
         self.navigate_to_pose_client = ActionClient(
@@ -119,35 +144,71 @@ class Controller(Node):
         if not self.goal_set or not self.waypoints or self.current_goal_idx >= len(self.waypoints):
             return
 
+        # if stop button is pressed, don't send next waypoint
+        if not getattr(self, 'is_running', True):
+            return
+
         # Check distance to current goal
         cur_pos = self.current_pose.position
         goal_pos = self.goals[self.current_goal_idx].position
 
         dist = self.compute_distance(cur_pos, goal_pos)
 
-        if dist < 1.0   :
-            self.get_logger().info(f"Waypoint {self.current_goal_idx + 1} reached manually (dist: {dist:.2f}m < 0.6m threshold).")
-    
-
         # If within 1.0 meters, forcefully advance
-        if dist < 1.0:
-            self.get_logger().info(f"Waypoint {self.current_goal_idx + 1} reached manually (dist: {dist:.2f}m < 0.6m threshold).")
+        if dist < 1.0 and not self.waiting_for_continue:    
+            self.get_logger().info(f"Waypoint {self.current_goal_idx + 1} reached! Pausuing for continue button")
             
+            # Cancel the active Nav2 driving goal so the robot actually stops moving!
+            if hasattr(self, 'active_goal_handle') and self.active_goal_handle is not None:
+                self.active_goal_handle.cancel_goal_async()
+
             # Formally register this segment's distance as completed
             if self.current_goal_idx < len(self.segment_distances):
                 self.completed_mission_distance += self.segment_distances[self.current_goal_idx]
 
+            # Pause until continue callback is triggered
             self.manual_advance = True 
-            self.current_goal_idx += 1
-            self.get_logger().info(f"Moving onto the next goal on index {self.current_goal_idx + 1}")
-            self.send_next_waypoint()
-            
+            self.waiting_for_continue = True
+
+            # Inform GUI waypoint arrived
+            status_msg = String()
+            status_msg.data = "Arrived. Scanning items..."
+            self.status_pub.publish(status_msg)
+
     def laser_callback(self, msg):
         self.last_scan = msg
         self.laser_received = True 
 
     def odom_callback(self, msg):
         self.current_pose = msg.pose.pose
+
+    def continue_callback(self, msg):
+        if msg.data == True and self.waiting_for_continue:
+            # The user clicked Continue on the GUI
+            self.get_logger().info("Continue button pressed by user! Moving to the next waypoint.")
+            self.waiting_for_continue = False
+
+            self.current_goal_idx += 1
+            self.send_next_waypoint()
+
+    def robot_run_callback(self, msg):
+        run_cmd = msg.data
+        if run_cmd == True and not self.is_running:
+            self.get_logger().info("UI Start button pressed! Resuming navigation.")
+            self.is_running = True
+
+            # if we have goals loaded and we aren't waiting at a shelf, start driving
+            if self.goal_set and not getattr(self, 'waiting_for_continue', False):
+                self.send_next_waypoint()
+
+        elif run_cmd == False and self.is_running:
+            self.get_logger().info("UI Stop button pressed! Halting robot.")
+            self.is_running = False
+
+            # Force stop Nav2
+            if getattr(self, 'active_goal_handle', None) is not None:
+                self.manual_advance = True
+                self.active_goal_handle.cancel_goal_async()
 
     def image_callback(self, msg):
         try:
@@ -213,20 +274,26 @@ class Controller(Node):
         self.goal_set = len(self.goals) > 0
         
         if self.goal_set:
-            self.send_next_waypoint()
+            if self.is_running:
+                self.send_next_waypoint()
+            else:
+                self.get_logger().info("Waypoints loaded. Waiting for UI Start button to begin")
 
     def send_next_waypoint(self):
-        if self.current_goal_idx >= len(self.waypoints)+1:
+        if not self.is_running:
+            return
+            
+        if self.current_goal_idx >= len(self.waypoints):
             self.get_logger().info("All waypoints completed successfully!")
             self.goal_set = False
             return
-            
-        # if not self.navigate_to_pose_client.wait_for_server(timeout_sec=2.0):
-        #     self.get_logger().warn("NavigateToPose action server not available. Will retry later.")
-        #     return
 
         goal_msg = NavigateToPose.Goal()
-        goal_msg.pose = self.waypoints[self.current_goal_idx]
+        
+        # Ensure timestamp is fresh so Nav2 doesn't reject old tf data on resume
+        fresh_pose = self.waypoints[self.current_goal_idx]
+        fresh_pose.header.stamp = self.get_clock().now().to_msg()
+        goal_msg.pose = fresh_pose
 
         self.get_logger().info(f"Sending NavigateToPose goal for waypoint {self.current_goal_idx + 1}/{len(self.waypoints)}")
 
@@ -245,6 +312,7 @@ class Controller(Node):
             self.goal_set = False
             return
 
+        self.active_goal_handle = goal_handle
         self.get_logger().info("NavigateToPose goal accepted by server, waiting for result")
 
         # Wait for the action to complete()
