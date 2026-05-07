@@ -25,6 +25,7 @@ setup(
     entry_points={
     'console_scripts': [
         'gui_node = ui.main:main',
+        'staff_gui = ui.staff_main:main',
     ],
     }
 )

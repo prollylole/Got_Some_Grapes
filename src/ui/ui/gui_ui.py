@@ -13,12 +13,13 @@ class GUI(QWidget):
         self.mode = "normal"
 
         self.setWindowTitle("TurtleBot Control GUI")
-        self.setFixedSize(800, 300)
+        self.setFixedSize(800, 350)
 
         # ---------------- STATUS LABELS ----------------
         self.status = QLabel("Status: STOPPED")
         self.lidar = QLabel("Closest Distance: --")
         self.direction = QLabel("Obstacle Direction: --")
+        self.availability = QLabel("Item Status: Please wait...")
 
         # ---------------- OBJECT BUTTONS ----------------
         self.obj1 = QPushButton("Apple")
@@ -52,6 +53,7 @@ class GUI(QWidget):
         self.start_btn.setObjectName("start_btn")
         self.stop_btn.setObjectName("stop_btn")
         self.continue_btn.setObjectName("continue_btn")
+        self.stop_btn.setEnabled(False)
 
         # ---------------- MAIN LAYOUT ----------------
         main_layout = QGridLayout()
@@ -71,6 +73,7 @@ class GUI(QWidget):
         right_layout.addWidget(self.obj2, 1, 1)
         right_layout.addWidget(self.obj3, 2, 0)
         right_layout.addWidget(self.obj4, 2, 1)
+        right_layout.addWidget(self.availability)
 
         main_layout.addLayout(left_layout, 0, 0)
         main_layout.addLayout(right_layout, 0, 1)
