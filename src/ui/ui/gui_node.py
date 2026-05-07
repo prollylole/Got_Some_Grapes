@@ -22,7 +22,7 @@ class GuiNode(Node):
 
         self.mode = "normal"
         self.continue_state = False
-        self.ui.continue_btn.setEnabled(False)
+        self.ui.continue_btn.setEnabled(False) 
 
         # State
         self.selected_objects = []

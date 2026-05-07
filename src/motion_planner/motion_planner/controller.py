@@ -89,14 +89,41 @@ class Controller(Node):
             '/robot_run',
             self.robot_run_callback,
             10)
+            
+        self.selected_objects_sub = self.create_subscription(
+            String,
+            '/selected_objects',
+            self.selected_objects_callback,
+            10)
 
         self.is_running = False
+
+        def create_pose(x, y):
+            p = Pose()
+            p.position.x = x
+            p.position.y = y
+            p.position.z = 0.0
+            p.orientation.w = 1.0
+            return p
+
+        self.item_waypoints = {
+            'apple': create_pose(-4.62, 4.42),
+            'bottle': create_pose(1.72, 3.77),
+            'book': create_pose(1.32, -0.759),
+            'cup': create_pose(-4.6, 0.0),
+            'doll': create_pose(-5.71, -5.19),
+            'eggs': create_pose(0.72, -5.84)
+        }
 
         self.status_pub = self.create_publisher(
             String, 
             '/robot_status', 
             10)
 
+        self.continue_pub = self.create_publisher(
+            Bool, 
+            '/continue', 
+            10)
 
         # self.image_sub = self.create_subscription(
         #     Image,
@@ -175,6 +202,11 @@ class Controller(Node):
             status_msg.data = "Arrived. Scanning items..."
             self.status_pub.publish(status_msg)
 
+            # Inform GUI to enable the Continue button!
+            cont_msg = Bool()
+            cont_msg.data = False
+            self.continue_pub.publish(cont_msg)
+
     def laser_callback(self, msg):
         self.last_scan = msg
         self.laser_received = True 
@@ -209,6 +241,23 @@ class Controller(Node):
             if getattr(self, 'active_goal_handle', None) is not None:
                 self.manual_advance = True
                 self.active_goal_handle.cancel_goal_async()
+
+    def selected_objects_callback(self, msg):
+        if self.is_running:
+            self.get_logger().warn("Cannot update cart while robot is running! Please stop the robot first.")
+            return
+
+        items = [item.strip().lower() for item in msg.data.split(',')] if msg.data else []
+        
+        poses = []
+        for item in items:
+            if item in self.item_waypoints:
+                poses.append(self.item_waypoints[item])
+            else:
+                self.get_logger().warn(f"Unknown item selected: {item}")
+
+        # Update the active mission array
+        self.process_waypoints(poses, "map")
 
     def image_callback(self, msg):
         try:

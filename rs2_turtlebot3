@@ -188,8 +188,8 @@ ros2 topic pub --once /waypoints geometry_msgs/PoseArray "{header: {frame_id: 'm
   {position: {x: 0.72, y: -5.84, z: 0.0}, orientation: {w: 1.0}}
 ]}"
 
-
-
+ros2 topic pub /continue std_msgs/msg/Bool "{data: false}" --once
+ros2 run ui gui_node
 
 
 SLAM
@@ -206,7 +206,7 @@ couple of message losses
 probably because running rviz, gazebo and bringup make clashes happen
 
 NOTE:
-- when run the code of tb3 ROBOTIS, we have the clone of the code in our own laptop. 
+- when run the code of tb3 ROBOTIS, we have the clonecan you analyse the colour_service_node.py, gui_detection_bridge.py and controller.py and explain to me how i can integrate the HSV functionality from perception into controller.py and therefore integrating gui, motion planning and perception of the code in our own laptop. 
 But, the tb3 code setting in ssh pi would be the old version so in that case, 
 we will need to remove '/' from 'base_footprint' in robot.launch.py
 because that is based from the older version of code
@@ -224,3 +224,4 @@ if i set an array of 4 waypoints, it only reach 3 even tho all waypoints are rea
 if i set an array of 2 waypoints (same waypoints), it reaches 2 but
 i have to tweak the tolerance big enough to be reachable, if it's small, the next waypoint is aborted
 
+can you analyse the colour_service_node.py, gui_detection_bridge.py and controller.py and explain to me how i can integrate the HSV functionality from perception into controller.py and therefore integrating gui, motion planning and perception

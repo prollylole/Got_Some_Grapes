@@ -26,11 +26,15 @@ class GUI(QWidget):
         self.obj2 = QPushButton("Bottle")
         self.obj3 = QPushButton("Cup")
         self.obj4 = QPushButton("Book")
+        self.obj5 = QPushButton("Doll")
+        self.obj6 = QPushButton("Eggs")
 
         self.obj1.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.obj2.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.obj3.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.obj4.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.obj5.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.obj6.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
 
         self.obj1.customContextMenuRequested.connect(
             lambda pos: self.show_context_menu(pos, "apple", self.obj1)
@@ -43,6 +47,12 @@ class GUI(QWidget):
         )
         self.obj4.customContextMenuRequested.connect(
             lambda pos: self.show_context_menu(pos, "book", self.obj4)
+        )
+        self.obj5.customContextMenuRequested.connect(
+            lambda pos: self.show_context_menu(pos, "doll", self.obj5)
+        )
+        self.obj6.customContextMenuRequested.connect(
+            lambda pos: self.show_context_menu(pos, "eggs", self.obj6)
         )
 
         # ---------------- START/STOP BUTTONS ----------------
@@ -73,6 +83,8 @@ class GUI(QWidget):
         right_layout.addWidget(self.obj2, 1, 1)
         right_layout.addWidget(self.obj3, 2, 0)
         right_layout.addWidget(self.obj4, 2, 1)
+        right_layout.addWidget(self.obj5, 3, 0)
+        right_layout.addWidget(self.obj6, 3, 1)
         right_layout.addWidget(self.availability)
 
         main_layout.addLayout(left_layout, 0, 0)
