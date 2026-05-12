@@ -15,7 +15,7 @@ from builtin_interfaces.msg import Duration
 from action_msgs.msg import GoalStatus
 from std_msgs.msg import Bool, String
 
-from nav2_msgs.action import NavigateToPose
+from nav2_msgs.action import NavigateToPose, ComputePathToPose
 import cv_bridge
 
 class GoalStats:
@@ -96,7 +96,15 @@ class Controller(Node):
             self.selected_objects_callback,
             10)
 
+        self.mode_sub = self.create_subscription(
+            String,
+            '/mode',
+            self.mode_callback,
+            10)
+
         self.is_running = False
+        self.mode = "normal"
+        self.pending_items = []
 
         def create_pose(x, y):
             p = Pose()
@@ -152,6 +160,13 @@ class Controller(Node):
             self.get_logger().warn(f"NavigateToPose action server '{self.navigate_to_pose_action_name}' not available yet.")
         else:
             self.get_logger().info(f"NavigateToPose action client connected to '{self.navigate_to_pose_action_name}'.")
+
+        self.compute_path_client = ActionClient(
+            self,
+            ComputePathToPose,
+            '/compute_path_to_pose'
+        )
+        self.is_calculating = False
             
         self.waypoints = []
 
@@ -241,23 +256,54 @@ class Controller(Node):
             if getattr(self, 'active_goal_handle', None) is not None:
                 self.manual_advance = True
                 self.active_goal_handle.cancel_goal_async()
+    
+    def mode_callback(self, msg):
+        self.mode = msg.data
+        self.get_logger().info(f"Controller Mode switched to: {self.mode}")
 
     def selected_objects_callback(self, msg):
         if self.is_running:
             self.get_logger().warn("Cannot update cart while robot is running! Please stop the robot first.")
             return
 
-        items = [item.strip().lower() for item in msg.data.split(',')] if msg.data else []
-        
-        poses = []
-        for item in items:
-            if item in self.item_waypoints:
-                poses.append(self.item_waypoints[item])
-            else:
-                self.get_logger().warn(f"Unknown item selected: {item}")
+        self.pending_items.clear()
+        items_str = msg.data.split(',') if msg.data else []
+
+        # splitting demand and upsell string from selected object string
+        # name : demand level : upsell level
+        for item_str in items_str:
+            if not item_str: continue
+            parts = item_str.split(':')
+            if len(parts) == 3:
+                name = parts[0].strip().lower()
+
+                # demand mapping
+                d_level = parts[1]
+                demand_val = 0
+                if d_level == '1' : demand_val = 15
+                elif d_level == '2' : demand_val = 10
+                elif d_level == '3' : demand_val = 5
+
+                # upsel mapping
+                u_level = parts[2]
+                upsell_val = 0
+                if u_level == '1' : upsell_val = 12
+                elif u_level == '2' : upsell_val = 8
+                elif u_level == '3' : upsell_val = 4
+
+                if name in self.item_waypoints:
+                    self.pending_items.append({
+                        'name': name,
+                        'pose': self.item_waypoints[name],
+                        'demand': demand_val,
+                        'upsell': upsell_val
+                    })
+
+                else:
+                    self.get_logger().warn(f"Unknown item selected: {name}")
 
         # Update the active mission array
-        self.process_waypoints(poses, "map")
+        self.process_waypoints([], "map")
 
     def image_callback(self, msg):
         try:
@@ -275,58 +321,177 @@ class Controller(Node):
         frame = msg.header.frame_id if msg.header.frame_id else "map"
         self.process_waypoints(msg.poses, frame)
 
-    def process_waypoints(self, poses, frame="map"):
-        if not poses:
-            self.get_logger().warn("Empty goal pose list received")
-            return
-
-        waypoints = []
-
-        # Reset mission tracking variables
-        # erase waypoints from previous missions
-        self.goals.clear()
-        self.segment_distances.clear()
-        self.total_mission_distance = 0.0
-        self.completed_mission_distance = 0.0
-        self.current_goal_idx = 0
-
-        prev_pose = self.current_pose
-
-        # Uninitiliased pose check
-        have_prev = True
-        if math.isnan(prev_pose.position.x) and math.isnan(prev_pose.position.y):
-            have_prev = False
+    async def get_nav2_path_length(self, start_pos, goal_pos):
+        if not self.compute_path_client.wait_for_server(timeout_sec=1.0):
+            self.get_logger().warn("ComputePathToPose server not available, using Euclidean distance.")
+            return self.compute_distance(start_pos, goal_pos)
+            
+        goal_msg = ComputePathToPose.Goal()
+        goal_msg.use_start = True
         
-        for p in poses:
+        start_ps = PoseStamped()
+        start_ps.header.frame_id = "map"
+        start_ps.pose.position = start_pos
+        start_ps.pose.orientation.w = 1.0
+        goal_msg.start = start_ps
+        
+        goal_ps = PoseStamped()
+        goal_ps.header.frame_id = "map"
+        goal_ps.pose.position = goal_pos
+        goal_ps.pose.orientation.w = 1.0
+        goal_msg.goal = goal_ps
+        
+        goal_msg.planner_id = "GridBased"
+        
+        future = self.compute_path_client.send_goal_async(goal_msg)
+        goal_handle = await future
+        
+        if not goal_handle.accepted:
+            self.get_logger().warn("Path request rejected by Nav2 server, using Euclidean distance.")
+            return self.compute_distance(start_pos, goal_pos)
+            
+        result_future = goal_handle.get_result_async()
+        result = await result_future
+        
+        path = result.result.path
+        if not path.poses:
+            self.get_logger().warn("Empty path returned by Nav2 server, using Euclidean distance.")
+            return self.compute_distance(start_pos, goal_pos)
+            
+        total_dist = 0.0
+        prev = path.poses[0].pose.position
+        for i in range(1, len(path.poses)):
+            curr = path.poses[i].pose.position
+            total_dist += self.compute_distance(prev, curr)
+            prev = curr
+            
+        return total_dist
+
+    async def calculate_best_next_item(self, current_pos, pending_items, mode):
+        if not pending_items:
+            return None, -1, 0.0
+            
+        a = 1.5
+        b = 0.0
+        c = 1.0
+        
+        if mode == "upsell":
+            a = 1.0
+            b = 0.8
+            c = 1.0
+            
+        best_item = None
+        best_score = float('-inf')
+        best_idx = -1
+        
+        for i, item in enumerate(pending_items):
+            dist = await self.get_nav2_path_length(current_pos, item['pose'].position)
+            score = (a * item['demand']) + (b * item['upsell']) - (c * dist)
+            self.get_logger().info(f"Item: {item['name']} | Nav2 Dist: {dist:.2f}m | Score: {score:.2f}")
+            
+            if score > best_score:
+                best_score = score
+                best_item = item
+                best_idx = i
+                
+        return best_item, best_idx, best_score
+
+    async def recalculate_remaining_route(self):
+        if self.current_goal_idx >= len(self.pending_items):
+            return
+            
+        remaining = list(self.pending_items[self.current_goal_idx : ])
+        sorted_remaining = []
+        
+        sim_pos = self.current_pose.position
+        if math.isnan(sim_pos.x) or math.isnan(sim_pos.y):
+            sim_pos = Pose().position
+            sim_pos.x = 0.0
+            sim_pos.y = 0.0
+            
+        while remaining:
+            best_item, best_idx, score = await self.calculate_best_next_item(sim_pos, remaining, self.mode)
+            sorted_remaining.append(best_item)
+            sim_pos = best_item['pose'].position
+            remaining.pop(best_idx)
+            
+        self.pending_items[self.current_goal_idx : ] = sorted_remaining
+        
+        for i, item in enumerate(sorted_remaining):
+            idx = self.current_goal_idx + i
+            p = item['pose']
             ps = PoseStamped()
-            ps.header.frame_id = frame
+            ps.header.frame_id = "map"
             ps.header.stamp = self.get_clock().now().to_msg()
             ps.pose = p
-            waypoints.append(ps)
-
+            
+            self.waypoints[idx] = ps
             gs = GoalStats(position=p.position, orientation=p.orientation)
-            self.goals.append(gs)
-            self.get_logger().info(f"Goal {self.current_goal_idx + 1}: x={p.position.x}, y={p.position.y}, theta={p.orientation.z}")
-
-            seg = 0.0
-            if have_prev:
-                seg = self.compute_distance(prev_pose.position, p.position)
-
-            self.segment_distances.append(seg)
-            self.total_mission_distance += seg
-            self.get_logger().info("total mission distance: " + str(self.total_mission_distance))
-
-            prev_pose = p 
-            have_prev = True 
+            self.goals[idx] = gs
+            
+        prev_pos = self.current_pose.position if self.current_goal_idx == 0 else self.goals[self.current_goal_idx - 1].position
+        if math.isnan(prev_pos.x) and self.current_goal_idx == 0 and len(self.goals) > 0:
+            prev_pos = self.goals[0].position
+            
+        old_remaining_dist = sum(self.segment_distances[self.current_goal_idx : ])
+        self.total_mission_distance -= old_remaining_dist
         
-        self.waypoints = waypoints
+        new_segments = []
+        for i, item in enumerate(sorted_remaining):
+            idx = self.current_goal_idx + i
+            seg = self.compute_distance(prev_pos, item['pose'].position)
+            new_segments.append(seg)
+            self.total_mission_distance += seg
+            prev_pos = item['pose'].position
+            
+        self.segment_distances[self.current_goal_idx : ] = new_segments
+        self.publish_goal_markers()
+
+    def trigger_recalculation(self):
+        if getattr(self, 'is_calculating', False):
+            self.get_logger().warn("Already calculating a route, ignoring trigger.")
+            return
+            
+        self.recalc_timer = self.create_timer(0.0, self.async_recalculate_and_send)
+
+    async def async_recalculate_and_send(self):
+        if hasattr(self, 'recalc_timer') and self.recalc_timer:
+            self.recalc_timer.cancel()
+            self.recalc_timer = None
+            
+        self.is_calculating = True
+        self.get_logger().info("Asking Nav2 for path distances... this may take a moment.")
+        
+        await self.recalculate_remaining_route()
+        
+        self.is_calculating = False
         self.goal_set = len(self.goals) > 0
         
         if self.goal_set:
             if self.is_running:
-                self.send_next_waypoint()
+                self.dispatch_goal()
             else:
-                self.get_logger().info("Waypoints loaded. Waiting for UI Start button to begin")
+                self.get_logger().info(f"Waypoints loaded (Mode: {self.mode}). Waiting for UI Start button to begin")
+
+    def process_waypoints(self, poses, frame="map"):
+        if not self.pending_items:
+            self.get_logger().warn("Empty pending items list received")
+            self.goals.clear()
+            self.waypoints.clear()
+            self.segment_distances.clear()
+            self.goal_set = False
+            return
+        
+        # reset goal related variables
+        self.goals = [None] * len(self.pending_items)
+        self.segment_distances = [0.0] * len(self.pending_items)
+        self.total_mission_distance = 0.0
+        self.completed_mission_distance = 0.0
+        self.current_goal_idx = 0
+        self.waypoints = [None] * len(self.pending_items)
+
+        # Trigger async route recalculation
+        self.trigger_recalculation()
 
     def send_next_waypoint(self):
         if not self.is_running:
@@ -337,9 +502,20 @@ class Controller(Node):
             self.goal_set = False
             return
 
+        # Trigger async route recalculation
+        self.trigger_recalculation()
+
+    def dispatch_goal(self):
+        if not self.is_running:
+            return
+            
+        if self.current_goal_idx >= len(self.waypoints):
+            return
+
+        current_target = self.pending_items[self.current_goal_idx]
+        self.get_logger().info(f"Dynamic Route: Selected '{current_target['name']}' as next target.")
+
         goal_msg = NavigateToPose.Goal()
-        
-        # Ensure timestamp is fresh so Nav2 doesn't reject old tf data on resume
         fresh_pose = self.waypoints[self.current_goal_idx]
         fresh_pose.header.stamp = self.get_clock().now().to_msg()
         goal_msg.pose = fresh_pose

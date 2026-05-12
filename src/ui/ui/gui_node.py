@@ -111,10 +111,19 @@ class GuiNode(Node):
 
     # ---------------- OBJECT SELECTION ----------------
     def choose_object(self, obj_name, button):
-        if obj_name in self.selected_objects:
-            return
+        demand_text = self.ui.demand_combo.currentText()
+        upsell_text = self.ui.upsell_combo.currentText()
 
-        self.selected_objects.append(obj_name)
+        demand_level = demand_text.split()[-1]
+        upsell_level = upsell_text.split()[-1]
+
+        formatted_name = f"{obj_name}:{demand_level}:{upsell_level}"
+
+        # ensure we don't add the exact same object and priority combo twice
+        if formatted_name in self.selected_objects:
+            return
+        
+        self.selected_objects.append(formatted_name)
         self.update_cart_display()
 
         msg = String()
@@ -124,17 +133,18 @@ class GuiNode(Node):
         button.setText(f"{obj_name} ✓")
         button.setStyleSheet("background-color: gray;")
 
-    def remove_object(self, obj_name, button):
-        if obj_name not in self.selected_objects:
+    def remove_object(self, target_obj, button):
+        if target_obj not in self.selected_objects:
             return
 
-        self.selected_objects.remove(obj_name)
+        self.selected_objects.remove(target_obj)
         self.update_cart_display()
 
         msg = String()
         msg.data = ",".join(self.selected_objects)
         self.object_pub.publish(msg)
 
+        obj_name = target_obj.split(':')[0]
         button.setText(obj_name.capitalize())
         button.setStyleSheet("background-color: #3a86ff;")
 
@@ -154,8 +164,14 @@ class GuiNode(Node):
             self.ui.cart_items_layout.addWidget(label)
             return
 
+        # select demand and upsell level
         for obj in self.selected_objects:
-            label = QLabel(obj.capitalize())
+            parts = obj.split(':')
+            display_name = parts[0].capitalize()
+            if len(parts) == 3:
+                display_name += f" (D:{parts[1]} U:{parts[2]})"
+                
+            label = QLabel(display_name)
             label.setStyleSheet(
                 "font-size:15px; background: none; border: none; "
                 "padding: 0; margin: 0;"

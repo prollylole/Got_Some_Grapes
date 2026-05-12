@@ -1,7 +1,7 @@
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QWidget, QPushButton, QLabel, QVBoxLayout,
-    QHBoxLayout, QGridLayout, QMenu
+    QHBoxLayout, QGridLayout, QMenu, QComboBox
 )
 
 
@@ -74,18 +74,27 @@ class GUI(QWidget):
         left_layout.addWidget(self.lidar)
         left_layout.addWidget(self.direction)
 
+        # ---------------- PRIORITY DROPDOWNS ----------------
+        self.demand_combo = QComboBox()
+        self.demand_combo.addItems(["Demand: 1", "Demand: 2", "Demand: 3"])
+        
+        self.upsell_combo = QComboBox()
+        self.upsell_combo.addItems(["Upsell: None", "Upsell: 1", "Upsell: 2", "Upsell: 3"])
+
         # RIGHT PANEL (object selection)
         right_layout = QGridLayout()
         self.obj_label = QLabel("Pick the objects you want: ")
 
-        right_layout.addWidget(self.obj_label, 0, 0, 1, 2)
-        right_layout.addWidget(self.obj1, 1, 0)
-        right_layout.addWidget(self.obj2, 1, 1)
-        right_layout.addWidget(self.obj3, 2, 0)
-        right_layout.addWidget(self.obj4, 2, 1)
-        right_layout.addWidget(self.obj5, 3, 0)
-        right_layout.addWidget(self.obj6, 3, 1)
-        right_layout.addWidget(self.availability)
+        right_layout.addWidget(self.demand_combo, 0, 0)
+        right_layout.addWidget(self.upsell_combo, 0, 1)
+        right_layout.addWidget(self.obj_label, 1, 0, 1, 2)
+        right_layout.addWidget(self.obj1, 2, 0)
+        right_layout.addWidget(self.obj2, 2, 1)
+        right_layout.addWidget(self.obj3, 3, 0)
+        right_layout.addWidget(self.obj4, 3, 1)
+        right_layout.addWidget(self.obj5, 4, 0)
+        right_layout.addWidget(self.obj6, 4, 1)
+        right_layout.addWidget(self.availability, 5, 0, 1, 2)
 
         main_layout.addLayout(left_layout, 0, 0)
         main_layout.addLayout(right_layout, 0, 1)
@@ -214,7 +223,13 @@ class GUI(QWidget):
         if not self.node:
             return
 
-        if obj_name not in self.node.selected_objects:
+        target_obj = None
+        for item in self.node.selected_objects:
+            if item.startswith(f"{obj_name}:"):
+                target_obj = item
+                break
+
+        if not target_obj:
             return
 
         menu = QMenu(self)
@@ -223,7 +238,7 @@ class GUI(QWidget):
         action = menu.exec(button.mapToGlobal(pos))
 
         if action == remove_action:
-            self.node.remove_object(obj_name, button)
+            self.node.remove_object(target_obj, button)
 
     def show_global_menu(self, pos):
         widget = self.childAt(pos)
