@@ -14,8 +14,8 @@ from std_msgs.msg import Float64
 from builtin_interfaces.msg import Duration
 from action_msgs.msg import GoalStatus
 from std_msgs.msg import Bool, String
-
 from nav2_msgs.action import NavigateToPose, ComputePathToPose
+
 import cv_bridge
 
 class GoalStats:
@@ -167,7 +167,7 @@ class Controller(Node):
             '/compute_path_to_pose'
         )
         self.is_calculating = False
-            
+        
         self.waypoints = []
 
         self.cv_bridge = cv_bridge.CvBridge()
@@ -320,12 +320,15 @@ class Controller(Node):
     def array_goal_pose_callback(self, msg):
         frame = msg.header.frame_id if msg.header.frame_id else "map"
         self.process_waypoints(msg.poses, frame)
-
+    
+    # using Nav2 compute path service to get the length of path between 2 points
+    # async and wait are used for non blocking calls, this means the program runs in the background
+    # while waiting for the server response, the controller can do other things like receiving callbacks
     async def get_nav2_path_length(self, start_pos, goal_pos):
         if not self.compute_path_client.wait_for_server(timeout_sec=1.0):
-            self.get_logger().warn("ComputePathToPose server not available, using Euclidean distance.")
+            self.get_logger().warn("ComputePathToPose server not available, using Euclidean distannce.")
             return self.compute_distance(start_pos, goal_pos)
-            
+        
         goal_msg = ComputePathToPose.Goal()
         goal_msg.use_start = True
         
@@ -334,46 +337,53 @@ class Controller(Node):
         start_ps.pose.position = start_pos
         start_ps.pose.orientation.w = 1.0
         goal_msg.start = start_ps
-        
+
         goal_ps = PoseStamped()
         goal_ps.header.frame_id = "map"
         goal_ps.pose.position = goal_pos
         goal_ps.pose.orientation.w = 1.0
         goal_msg.goal = goal_ps
-        
+
         goal_msg.planner_id = "GridBased"
-        
+
+        # Nav2 takes time to calculate path, using future allows non blocking functionality while it is calculating for path
         future = self.compute_path_client.send_goal_async(goal_msg)
         goal_handle = await future
-        
+
         if not goal_handle.accepted:
             self.get_logger().warn("Path request rejected by Nav2 server, using Euclidean distance.")
             return self.compute_distance(start_pos, goal_pos)
-            
+
         result_future = goal_handle.get_result_async()
         result = await result_future
-        
+
+        # received path from Nav2 server 
         path = result.result.path
+
+        # if Nav2 fails to generate a path, we use the Euclidean distance between the two points
         if not path.poses:
             self.get_logger().warn("Empty path returned by Nav2 server, using Euclidean distance.")
             return self.compute_distance(start_pos, goal_pos)
-            
+        
         total_dist = 0.0
         prev = path.poses[0].pose.position
+
+        # looping individual segments of path to calculate the total length of path
         for i in range(1, len(path.poses)):
             curr = path.poses[i].pose.position
             total_dist += self.compute_distance(prev, curr)
             prev = curr
-            
+
         return total_dist
 
     async def calculate_best_next_item(self, current_pos, pending_items, mode):
         if not pending_items:
             return None, -1, 0.0
             
-        a = 1.5
-        b = 0.0
-        c = 1.0
+        # normal mode 
+        a = 1.5 # demand factor
+        b = 0.0 # upsell factor
+        c = 1.0 # distance factor
         
         if mode == "upsell":
             a = 1.0
@@ -396,19 +406,26 @@ class Controller(Node):
                 
         return best_item, best_idx, best_score
 
+    # loops through all pending items and query Nav2 for the actual path length for every item in the loop
+    # calculate the score for each item using the score formula then store the best item in remaining route
     async def recalculate_remaining_route(self):
         if self.current_goal_idx >= len(self.pending_items):
             return
             
+        # remaining updates pending item
         remaining = list(self.pending_items[self.current_goal_idx : ])
         sorted_remaining = []
         
+        # get current position
         sim_pos = self.current_pose.position
         if math.isnan(sim_pos.x) or math.isnan(sim_pos.y):
             sim_pos = Pose().position
             sim_pos.x = 0.0
             sim_pos.y = 0.0
             
+        # use current position and pending items to update remaining route using the score formula
+        # add best item to sorted_remaining then remove from remaining, repeat until remaining is empty
+        # update self.pending_items to be the sorted_remaining
         while remaining:
             best_item, best_idx, score = await self.calculate_best_next_item(sim_pos, remaining, self.mode)
             sorted_remaining.append(best_item)
@@ -417,6 +434,7 @@ class Controller(Node):
             
         self.pending_items[self.current_goal_idx : ] = sorted_remaining
         
+        # store new ordered goals from sorted_remaining in self.goals for controller
         for i, item in enumerate(sorted_remaining):
             idx = self.current_goal_idx + i
             p = item['pose']
@@ -429,44 +447,60 @@ class Controller(Node):
             gs = GoalStats(position=p.position, orientation=p.orientation)
             self.goals[idx] = gs
             
+        # if we are at the beginning, use current position, otherwise get previous goal position
         prev_pos = self.current_pose.position if self.current_goal_idx == 0 else self.goals[self.current_goal_idx - 1].position
         if math.isnan(prev_pos.x) and self.current_goal_idx == 0 and len(self.goals) > 0:
             prev_pos = self.goals[0].position
             
+        # get total distance of remaining segments and subtract from total distance because we recaculated the route
         old_remaining_dist = sum(self.segment_distances[self.current_goal_idx : ])
         self.total_mission_distance -= old_remaining_dist
         
+        # calculate new distances and add to total distance for distance travelled using sorted remaining 
+        # calculated from the best item 
         new_segments = []
         for i, item in enumerate(sorted_remaining):
             idx = self.current_goal_idx + i
             seg = self.compute_distance(prev_pos, item['pose'].position)
             new_segments.append(seg)
+            
             self.total_mission_distance += seg
             prev_pos = item['pose'].position
             
         self.segment_distances[self.current_goal_idx : ] = new_segments
         self.publish_goal_markers()
 
+    # runs asynchronous timer to trigger recalculation in the background
     def trigger_recalculation(self):
         if getattr(self, 'is_calculating', False):
             self.get_logger().warn("Already calculating a route, ignoring trigger.")
             return
-            
+
+        # comment this
         self.recalc_timer = self.create_timer(0.0, self.async_recalculate_and_send)
 
+    async def recalculate_and_trigger(self):
+        if getattr(self, 'is_calculating', False):
+            self.get_logger().warn("Already calculating a route, ignoring trigger.")
+            return
+        
+        self.is_calculating = True
+
+    # if calculating flag is true, run recalculate remaining route function and send goals to Nav2 using dispatch_goal
     async def async_recalculate_and_send(self):
         if hasattr(self, 'recalc_timer') and self.recalc_timer:
             self.recalc_timer.cancel()
             self.recalc_timer = None
-            
+
         self.is_calculating = True
         self.get_logger().info("Asking Nav2 for path distances... this may take a moment.")
-        
+
+        # comment this
         await self.recalculate_remaining_route()
-        
+
         self.is_calculating = False
         self.goal_set = len(self.goals) > 0
-        
+
         if self.goal_set:
             if self.is_running:
                 self.dispatch_goal()
@@ -501,14 +535,15 @@ class Controller(Node):
             self.get_logger().info("All waypoints completed successfully!")
             self.goal_set = False
             return
-
-        # Trigger async route recalculation
+        
+        # trigger async route recalculation
         self.trigger_recalculation()
 
+    # send goal with current target from pending items and current goal index to Nav2 to execute 
     def dispatch_goal(self):
         if not self.is_running:
             return
-            
+        
         if self.current_goal_idx >= len(self.waypoints):
             return
 
