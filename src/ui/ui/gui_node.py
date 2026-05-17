@@ -3,7 +3,7 @@ from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy
 
 from sensor_msgs.msg import LaserScan
-from std_msgs.msg import Bool, String
+from std_msgs.msg import Bool, String, Float64
 
 from PyQt6.QtWidgets import QLabel
 
@@ -38,6 +38,11 @@ class GuiNode(Node):
         self.create_subscription(Bool, '/continue', self.continue_callback, 10)
         self.create_subscription(Bool, '/item_availability', self.availability_callback,10)
 
+        # adding telemetry data
+        self.create_subscription(Float64, '/mission_progress', self.progress_callback, 10)
+        self.create_subscription(String, '/mission_distance', self.distance_callback, 10)
+        self.create_subscription(String, '/active_route', self.route_callback, 10)
+
     # ---------------- CONTROL ----------------
     def start_robot(self):
         self.publish_control(True)
@@ -62,6 +67,18 @@ class GuiNode(Node):
     # ---------------- STATUS ----------------
     def status_callback(self, msg):
         self.ui.status.setText(f"Status: {msg.data}")
+        if "Mission Complete" in msg.data:
+            self.clear_cart()
+
+    # ---------------- TELEMETRY ----------------
+    def progress_callback(self, msg):
+        self.ui.update_progress_signal.emit(int(msg.data))
+        
+    def distance_callback(self, msg):
+        self.ui.update_distance_signal.emit(f"Distance Travelled: {msg.data}")
+        
+    def route_callback(self, msg):
+        self.ui.update_route_signal.emit(f"Active Route: {msg.data}")
 
     # ---------------- SCAN PROCESSING ----------------
     def scan_callback(self, msg):
@@ -177,6 +194,23 @@ class GuiNode(Node):
                 "padding: 0; margin: 0;"
             )
             self.ui.cart_items_layout.addWidget(label)
+
+    def clear_cart(self):
+        self.selected_objects.clear()
+        self.update_cart_display()
+
+        buttons = [
+            ("apple", self.ui.obj1),
+            ("bottle", self.ui.obj2),
+            ("cup", self.ui.obj3),
+            ("book", self.ui.obj4),
+            ("doll", self.ui.obj5),
+            ("eggs", self.ui.obj6)
+        ]
+
+        for name, btn in buttons:
+            btn.setText(name.capitalize())
+            btn.setStyleSheet("background-color: #3a86ff;")
 
     # ---------------- CONTINUE BUTTON ----------------
     def continue_callback(self, msg):

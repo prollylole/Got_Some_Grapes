@@ -1,6 +1,6 @@
 import cv2
 from rclpy.node import Node
-from std_msgs.msg import Bool, String
+from std_msgs.msg import Bool, String, Float64
 from sensor_msgs.msg import Image, CompressedImage
 from cv_bridge import CvBridge
 from PyQt6.QtGui import QImage, QPixmap
@@ -25,6 +25,11 @@ class StaffNode(Node):
         self.create_subscription(String, '/robot_status', self.status_callback, 10)
         self.create_subscription(CompressedImage, '/camera/image_raw/compressed', self.image_callback, 10)
 
+        # add telemtry
+        self.create_subscription(Float64, '/mission_progress', self.progress_callback, 10)
+        self.create_subscription(String, '/mission_distance', self.distance_callback, 10)
+        self.create_subscription(String, '/active_route', self.route_callback, 10)
+
     # ---------------- CONTROL ----------------
     def start_robot(self):
         msg = Bool()
@@ -44,6 +49,16 @@ class StaffNode(Node):
     # ---------------- STATUS ----------------
     def status_callback(self, msg):
         self.ui.status.setText(f"Status: {msg.data}")
+
+    # ---------------- TELEMETRY ----------------
+    def progress_callback(self, msg):
+        self.ui.update_progress_signal.emit(int(msg.data))
+        
+    def distance_callback(self, msg):
+        self.ui.update_distance_signal.emit(f"Distance Travelled: {msg.data}")
+        
+    def route_callback(self, msg):
+        self.ui.update_route_signal.emit(f"Active Route: {msg.data}")
 
     # ---------------- MODE ----------------
     def set_mode(self, mode):

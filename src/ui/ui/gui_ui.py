@@ -1,11 +1,15 @@
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QWidget, QPushButton, QLabel, QVBoxLayout,
-    QHBoxLayout, QGridLayout, QMenu, QComboBox
+    QHBoxLayout, QGridLayout, QMenu, QComboBox, QProgressBar
 )
 
 
 class GUI(QWidget):
+    update_progress_signal = pyqtSignal(int)
+    update_distance_signal = pyqtSignal(str)
+    update_route_signal = pyqtSignal(str)
+
     def __init__(self):
         super().__init__()
 
@@ -20,6 +24,18 @@ class GUI(QWidget):
         self.lidar = QLabel("Closest Distance: --")
         self.direction = QLabel("Obstacle Direction: --")
         self.availability = QLabel("Item Status: Please wait...")
+        
+        # ---------------- TELEMETRY LABELS ----------------
+        self.route_lbl = QLabel("Active Route: --")
+        self.distance_lbl = QLabel("Total Distance: --")
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setTextVisible(True)
+        
+        self.update_progress_signal.connect(self.progress_bar.setValue)
+        self.update_distance_signal.connect(self.distance_lbl.setText)
+        self.update_route_signal.connect(self.route_lbl.setText)
 
         # ---------------- OBJECT BUTTONS ----------------
         self.obj1 = QPushButton("Apple")
@@ -73,6 +89,9 @@ class GUI(QWidget):
         left_layout.addWidget(self.status)
         left_layout.addWidget(self.lidar)
         left_layout.addWidget(self.direction)
+        left_layout.addWidget(self.route_lbl)
+        left_layout.addWidget(self.distance_lbl)
+        left_layout.addWidget(self.progress_bar)
 
         # ---------------- PRIORITY DROPDOWNS ----------------
         self.demand_combo = QComboBox()

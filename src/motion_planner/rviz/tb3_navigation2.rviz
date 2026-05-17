@@ -522,7 +522,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /waypoints
+        Value: /visualization_marker
       Value: true
   Enabled: true
   Global Options:

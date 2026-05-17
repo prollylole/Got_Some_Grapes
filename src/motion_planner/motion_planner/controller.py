@@ -92,6 +92,11 @@ class Controller(Node):
             self.robot_run_callback,
             10)
             
+        self.robot_run_pub = self.create_publisher(
+            Bool,
+            '/robot_run',
+            10)
+            
         self.selected_objects_sub = self.create_subscription(
             String,
             '/selected_objects',
@@ -135,6 +140,12 @@ class Controller(Node):
             '/continue', 
             10)
 
+        self.active_route_pub = self.create_publisher(
+            String,
+            '/active_route',
+            10
+        ) 
+
         # self.image_sub = self.create_subscription(
         #     Image,
         #     '/camera/image',
@@ -145,7 +156,7 @@ class Controller(Node):
         # Publishers
         self.marker_pub = self.create_publisher(MarkerArray, '/visualization_marker', 10)
         self.mission_progress_pub = self.create_publisher(Float64, '/mission_progress', 10)
-        self.mission_distance_pub = self.create_publisher(Float64, '/mission_distance', 10)
+        self.mission_distance_pub = self.create_publisher(String, '/mission_distance', 10)
         self.status_pub = self.create_publisher(String, 'robot_status', 10)
 
         # continue/pause button 
@@ -202,13 +213,51 @@ class Controller(Node):
 
         # Check distance to current goal
         cur_pos = self.current_pose.position
-        goal_pos = self.goals[self.current_goal_idx].position
 
+        # guard against uninitialised odometry
+        if math.isnan(cur_pos.x) or math.isnan(cur_pos.y):
+            return
+            
+        goal_pos = self.goals[self.current_goal_idx].position
         dist = self.compute_distance(cur_pos, goal_pos)
 
-        # If within 1.0 meters, forcefully advance
-        if dist < 1.0 and not self.waiting_for_continue:    
-            self.get_logger().info(f"Waypoint {self.current_goal_idx + 1} reached! Pausuing for continue button")
+        # stuck detection to prevent robot from stalling:
+        # if robot moves less than 0.2m in 5s, consider it stalling
+        now = self.get_clock().now()
+        is_stuck = False
+
+        # if robot is moving and if stuck anchor is zero, always update stuck anchor to current position
+        if not self.waiting_for_continue:
+            if not hasattr(self, 'stuck_anchor_pos') or self.stuck_anchor_pos is None:
+                self.stuck_anchor_pos = Pose().position
+                self.stuck_anchor_pos.x = cur_pos.x
+                self.stuck_anchor_pos.y = cur_pos.y
+                self.stuck_anchor_time = now
+            else:
+                # calculate the distance between current position and stuck anchor position
+                movement = self.compute_distance(cur_pos, self.stuck_anchor_pos)
+                # if movement is greater than 0.2m, update stuck anchor position
+                if movement > 0.2:
+                    self.stuck_anchor_pos.x = cur_pos.x
+                    self.stuck_anchor_pos.y = cur_pos.y
+                    self.stuck_anchor_time = now
+
+                # if movement is less than 0.2m, check time difference of now and stuck anchor time
+                # if time difference is greater than 5s, robot is stuck
+                else:
+                    dt = (now - self.stuck_anchor_time).nanoseconds / 1e9
+                    if dt > 5.0:
+                        is_stuck = True
+
+        # If within 1.0 meters OR stuck for > 5 seconds and robot still processing waypoint 
+        # then consider the waypoint reached
+        if (dist < 1.0 or is_stuck) and not self.waiting_for_continue:    
+            if is_stuck:
+                self.get_logger().info(f"Robot stuck for >5s (moved <20cm). Assuming Waypoint {self.current_goal_idx + 1} reached!")
+            else:
+                self.get_logger().info(f"Waypoint {self.current_goal_idx + 1} reached! Pausing for continue button")
+                
+            self.stuck_anchor_pos = None # Reset for the next run
             
             # Cancel the active Nav2 driving goal so the robot actually stops moving!
             if hasattr(self, 'active_goal_handle') and self.active_goal_handle is not None:
@@ -272,10 +321,13 @@ class Controller(Node):
         self.get_logger().info(f"Controller Mode switched to: {self.mode}")
 
     def selected_objects_callback(self, msg):
+        # cannot add items to cart while mission started
         if self.is_running:
             self.get_logger().warn("Cannot update cart while robot is running! Please stop the robot first.")
             return
 
+        # clear existing pending items and populate with newly clicked items
+        # then passes control to process_waypoints
         self.pending_items.clear()
         items_str = msg.data.split(',') if msg.data else []
 
@@ -455,6 +507,12 @@ class Controller(Node):
             remaining.pop(best_idx)
             
         new_route_names = [item['name'] for item in sorted_remaining]
+
+        # publish the active route to gui
+        route_msg = String()
+        route_msg.data = " -> ".join(new_route_names) if new_route_names else "None"
+        self.active_route_pub.publish(route_msg)
+        
         if old_route_names != new_route_names and len(old_route_names) > 1:
             old_str = " -> ".join(old_route_names)
             new_str = " -> ".join(new_route_names)
@@ -506,7 +564,7 @@ class Controller(Node):
             self.get_logger().warn("Already calculating a route, ignoring trigger.")
             return
 
-        # comment this
+        # call recalculate and send async immediately
         self.recalc_timer = self.create_timer(0.0, self.async_recalculate_and_send, callback_group=self.action_cb_group)
 
     async def recalculate_and_trigger(self):
@@ -546,7 +604,7 @@ class Controller(Node):
             self.goal_set = False
             return
         
-        # reset goal related variables
+        # reset goal related variables once pending items are loaded
         self.goals = [None] * len(self.pending_items)
         self.segment_distances = [0.0] * len(self.pending_items)
         self.total_mission_distance = 0.0
@@ -564,6 +622,15 @@ class Controller(Node):
         if self.current_goal_idx >= len(self.waypoints):
             self.get_logger().info("All waypoints completed successfully!")
             self.goal_set = False
+            self.is_running = False
+            
+            run_msg = Bool()
+            run_msg.data = False
+            self.robot_run_pub.publish(run_msg)
+            
+            status_msg = String()
+            status_msg.data = "Mission Complete."
+            self.status_pub.publish(status_msg)
             return
         
         # trigger async route recalculation
@@ -686,13 +753,13 @@ class Controller(Node):
                 arrow.points.append(self.current_pose.position)
                 arrow.points.append(g.position)
                 
-                arrow.scale.x = 5.0
-                arrow.scale.y = 5.0
-                arrow.scale.z = 5.0
+                arrow.scale.x = 0.05
+                arrow.scale.y = 0.1
+                arrow.scale.z = 0.2
                 
                 arrow.color.r = 1.0
-                arrow.color.g = 0.2
-                arrow.color.b = 0.2
+                arrow.color.g = 0.0
+                arrow.color.b = 0.0
                 arrow.color.a = 1.0
                 
                 arrow.lifetime = Duration(sec=0, nanosec=200_000_000) # 200ms
@@ -703,10 +770,11 @@ class Controller(Node):
             self.marker_pub.publish(arr)
 
     def publish_telemetry(self):
-        dist_msg = Float64()
+        dist_msg = String()
         prog_msg = Float64()
 
         progress = 0.0
+        completed = 0.0
 
         if not self.goal_set or not self.goals or self.total_mission_distance <= 1e-6:
             progress = 0.0
@@ -737,7 +805,7 @@ class Controller(Node):
 
             progress = max(0.0, min(100.0, progress))
         
-        dist_msg.data = self.total_mission_distance
+        dist_msg.data = f"{completed:.2f}m / {self.total_mission_distance:.2f}m"
         prog_msg.data = progress
 
         self.mission_distance_pub.publish(dist_msg)

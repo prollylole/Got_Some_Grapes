@@ -1,12 +1,15 @@
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QWidget, QPushButton, QLabel, QVBoxLayout,
-    QHBoxLayout, QMenu
+    QHBoxLayout, QMenu, QProgressBar
 )
 from PyQt6.QtWidgets import QComboBox
 
 class StaffGUI(QWidget):
     add_stock_item_signal = pyqtSignal(str)
+    update_progress_signal = pyqtSignal(int)
+    update_distance_signal = pyqtSignal(str)
+    update_route_signal = pyqtSignal(str)
 
     def __init__(self):
         super().__init__()
@@ -19,6 +22,17 @@ class StaffGUI(QWidget):
 
         # ---------------- STATUS ----------------
         self.status = QLabel("Status: STOPPED")
+
+        # ---------------- TELEMETRY LABELS ----------------
+        self.route_lbl = QLabel("Active Route: --")
+        self.distance_lbl = QLabel("Total Distance: --")
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setTextVisible(True)
+        self.update_progress_signal.connect(self.progress_bar.setValue)
+        self.update_distance_signal.connect(self.distance_lbl.setText)
+        self.update_route_signal.connect(self.route_lbl.setText)
 
         # ---------------- MODE BUTTONS ----------------
         self.mode_label = QLabel("Mode")
@@ -120,6 +134,9 @@ class StaffGUI(QWidget):
         main_layout.addWidget(self.upsell_label)
         main_layout.addWidget(self.upsell_dropdown)
         main_layout.addWidget(self.status)
+        main_layout.addWidget(self.route_lbl) 
+        main_layout.addWidget(self.distance_lbl)
+        main_layout.addWidget(self.progress_bar)
         main_layout.addLayout(top_layout)
         main_layout.addStretch()
         main_layout.addLayout(control_layout)
