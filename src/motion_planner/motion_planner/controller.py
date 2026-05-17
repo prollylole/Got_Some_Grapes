@@ -5,6 +5,8 @@ import cv2
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
+from rclpy.executors import MultiThreadedExecutor
+from rclpy.callback_groups import ReentrantCallbackGroup
 
 from sensor_msgs.msg import LaserScan, Image
 from nav_msgs.msg import Odometry
@@ -149,11 +151,16 @@ class Controller(Node):
         # continue/pause button 
         self.waiting_for_continue = False
 
+        self.action_cb_group = ReentrantCallbackGroup()
+
         # Action Client for Nav2
+        # callback group allows us to have multiple callback functions (timer and action server responses)
+        # to be processed at the same time
         self.navigate_to_pose_client = ActionClient(
             self,
             NavigateToPose,
-            self.navigate_to_pose_action_name
+            self.navigate_to_pose_action_name,
+            callback_group=self.action_cb_group
         )
 
         if not self.navigate_to_pose_client.wait_for_server(timeout_sec=3.0):
@@ -161,10 +168,13 @@ class Controller(Node):
         else:
             self.get_logger().info(f"NavigateToPose action client connected to '{self.navigate_to_pose_action_name}'.")
 
+        # compute path to pose action client works concurrently with navigate to pose
+        # computing the path for best item formulation while driving to previous waypoint
         self.compute_path_client = ActionClient(
             self,
             ComputePathToPose,
-            '/compute_path_to_pose'
+            '/compute_path_to_pose',
+            callback_group=self.action_cb_group
         )
         self.is_calculating = False
         
@@ -376,7 +386,7 @@ class Controller(Node):
 
         return total_dist
 
-    async def calculate_best_next_item(self, current_pos, pending_items, mode):
+    async def calculate_best_next_item(self, current_pos, pending_items, mode, from_name="Robot Start"):
         if not pending_items:
             return None, -1, 0.0
             
@@ -390,21 +400,26 @@ class Controller(Node):
             b = 0.8
             c = 1.0
             
-        best_item = None
-        best_score = float('-inf')
-        best_idx = -1
-        
+        results = []
         for i, item in enumerate(pending_items):
             dist = await self.get_nav2_path_length(current_pos, item['pose'].position)
             score = (a * item['demand']) + (b * item['upsell']) - (c * dist)
-            self.get_logger().info(f"Item: {item['name']} | Nav2 Dist: {dist:.2f}m | Score: {score:.2f}")
+            results.append({
+                'item': item,
+                'idx': i,
+                'score': score,
+                'dist': dist,
+                'name': item['name']
+            })
             
-            if score > best_score:
-                best_score = score
-                best_item = item
-                best_idx = i
+        # Sort results by score descending
+        results.sort(key=lambda x: x['score'], reverse=True)
+        
+        for rank, res in enumerate(results):
+            self.get_logger().info(f"From: {from_name} -> To: {res['name']} | Nav2 Dist: {res['dist']:.2f}m | Score: {res['score']:.2f} | Rank: {rank+1}")
                 
-        return best_item, best_idx, best_score
+        best = results[0]
+        return best['item'], best['idx'], best['score']
 
     # loops through all pending items and query Nav2 for the actual path length for every item in the loop
     # calculate the score for each item using the score formula then store the best item in remaining route
@@ -414,6 +429,7 @@ class Controller(Node):
             
         # remaining updates pending item
         remaining = list(self.pending_items[self.current_goal_idx : ])
+        old_route_names = [item['name'] for item in remaining]
         sorted_remaining = []
         
         # get current position
@@ -423,15 +439,29 @@ class Controller(Node):
             sim_pos.x = 0.0
             sim_pos.y = 0.0
             
+        if self.current_goal_idx == 0:
+            current_from_name = "Robot Start"
+        else:
+            current_from_name = self.pending_items[self.current_goal_idx - 1]['name']
+            
         # use current position and pending items to update remaining route using the score formula
         # add best item to sorted_remaining then remove from remaining, repeat until remaining is empty
         # update self.pending_items to be the sorted_remaining
         while remaining:
-            best_item, best_idx, score = await self.calculate_best_next_item(sim_pos, remaining, self.mode)
+            best_item, best_idx, score = await self.calculate_best_next_item(sim_pos, remaining, self.mode, current_from_name)
             sorted_remaining.append(best_item)
             sim_pos = best_item['pose'].position
+            current_from_name = best_item['name']
             remaining.pop(best_idx)
             
+        new_route_names = [item['name'] for item in sorted_remaining]
+        if old_route_names != new_route_names and len(old_route_names) > 1:
+            old_str = " -> ".join(old_route_names)
+            new_str = " -> ".join(new_route_names)
+            self.get_logger().info(f"*** DYNAMIC ROUTE CHANGE DETECTED ***")
+            self.get_logger().info(f"Old Route: {old_str}")
+            self.get_logger().info(f"New Route: {new_str}")
+
         self.pending_items[self.current_goal_idx : ] = sorted_remaining
         
         # store new ordered goals from sorted_remaining in self.goals for controller
@@ -477,7 +507,7 @@ class Controller(Node):
             return
 
         # comment this
-        self.recalc_timer = self.create_timer(0.0, self.async_recalculate_and_send)
+        self.recalc_timer = self.create_timer(0.0, self.async_recalculate_and_send, callback_group=self.action_cb_group)
 
     async def recalculate_and_trigger(self):
         if getattr(self, 'is_calculating', False):
@@ -495,7 +525,7 @@ class Controller(Node):
         self.is_calculating = True
         self.get_logger().info("Asking Nav2 for path distances... this may take a moment.")
 
-        # comment this
+        # calculates the path distances using compute_path_to_pose action client and updates the segment_distance list
         await self.recalculate_remaining_route()
 
         self.is_calculating = False
@@ -612,6 +642,8 @@ class Controller(Node):
 
         marker_id = 0
         for i, g in enumerate(self.goals):
+            if g is None:
+                continue
             m = Marker()
             m.header.frame_id = "map"
             m.header.stamp = now
@@ -698,10 +730,10 @@ class Controller(Node):
                     current_segment_completed = max(0.0, seg_len - to_goal)
 
             completed = self.completed_mission_distance + current_segment_completed
-            self.get_logger().info(f"Goal {self.current_goal_idx} distance travelled: {completed}")
+            # self.get_logger().info(f"Goal {self.current_goal_idx} distance travelled: {completed}")
             
             progress = (completed / self.total_mission_distance) * 100.0 if self.total_mission_distance > 1e-6 else 0.0
-            self.get_logger().info(f"Progress of mission: {progress}")
+            # self.get_logger().info(f"Progress of mission: {progress}")
 
             progress = max(0.0, min(100.0, progress))
         
@@ -714,8 +746,10 @@ class Controller(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = Controller()
+    executor = MultiThreadedExecutor()
     try:
-        rclpy.spin(node)
+        # spinning multithreaded executor allows for concurrent execution of callbacks
+        rclpy.spin(node, executor=executor)
     except KeyboardInterrupt:
         node.get_logger().info("Turtlebot controller node shutting down")
     finally:
