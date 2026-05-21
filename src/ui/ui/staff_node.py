@@ -59,9 +59,9 @@ class StaffNode(Node):
 
     # ---------------- OUT OF STOCK ----------------
     def stock_callback(self, msg):
-        items = [item.strip() for item in msg.data.split(",") if item.strip()]
+        item = msg.data.strip()
 
-        for item in items:
+        if item:
             self.ui.add_stock_item_signal.emit(item)
 
     # ---------------- CAMERA ----------------

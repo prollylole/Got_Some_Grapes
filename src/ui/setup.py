@@ -27,6 +27,7 @@ setup(
         'gui_node = ui.main:main',
         'staff_gui = ui.staff_main:main',
         'gui_detection_bridge = ui.gui_detection_bridge:main',
+        'grocery_mission_node = ui.grocery_mission_node:main',
     ],
 }
 )

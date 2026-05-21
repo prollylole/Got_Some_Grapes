@@ -222,7 +222,7 @@ class ColourServiceNode(Node):
         self.declare_parameter('pixel_threshold', 1000)
         self.declare_parameter('required_detections', 3)
         self.declare_parameter('capture_timeout_sec', 5.0)
-        self.declare_parameter('show_debug_windows', False)
+        self.declare_parameter('show_debug_windows', True)
 
         self.camera_topic = self.get_parameter('camera_topic').get_parameter_value().string_value
         self.num_frames = self.get_parameter('num_frames').get_parameter_value().integer_value
