@@ -14,6 +14,8 @@ class StaffGUI(QWidget):
         self.node = None
         self.mode = "normal"
 
+        self.out_of_stock_items = set()
+
         self.setWindowTitle("Staff Control Panel")
         self.setFixedSize(700, 450)
 
@@ -190,6 +192,15 @@ class StaffGUI(QWidget):
 
     # ---------------- OUT OF STOCK DISPLAY ----------------
     def add_stock_item(self, item):
+        item = item.lower().strip()
+
+        # Do not add duplicates
+        if item in self.out_of_stock_items:
+            return
+
+        # Track currently displayed items
+        self.out_of_stock_items.add(item)
+
         button = QPushButton(item.capitalize())
         button.setObjectName("stock_item")
         button.setFlat(True)
@@ -216,6 +227,8 @@ class StaffGUI(QWidget):
         if action == stocked_action:
             self.stock_items_layout.removeWidget(button)
             button.deleteLater()
+        
+            self.out_of_stock_items.discard(button.text().lower().strip())
 
     # ---------------- RUN BUTTON UPDATE ----------------
     def update_run_buttons(self, running: bool):
