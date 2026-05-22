@@ -204,8 +204,8 @@ class GuiNode(Node):
             ("bottle", self.ui.obj2),
             ("cup", self.ui.obj3),
             ("book", self.ui.obj4),
-            ("doll", self.ui.obj5),
-            ("eggs", self.ui.obj6)
+            ("blueberries", self.ui.obj5),
+            ("banana", self.ui.obj6)
         ]
 
         for name, btn in buttons:
