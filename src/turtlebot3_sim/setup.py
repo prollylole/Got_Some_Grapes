@@ -13,6 +13,8 @@ setup(
     ('share/turtlebot3_sim/worlds', ['worlds/big_supermarket.world', 'worlds/supermarket_sim.world']),
     ('share/turtlebot3_sim/models/big_supermarket', ['models/big_supermarket/model.config', 'models/big_supermarket/model.sdf']),
     ('share/turtlebot3_sim/models/supermarket_sim_model', ['models/supermarket_sim_model/model.config', 'models/supermarket_sim_model/model.sdf']),
+    ('share/turtlebot3_sim/models/mock_supermarket', ['models/mock_supermarket/model.config', 'models/mock_supermarket/model.sdf']),
+    ('share/turtlebot3_sim/models/another_mock_supermarket', ['models/another_mock_supermarket/model.config', 'models/another_mock_supermarket/model.sdf']),
     ],
     install_requires=['setuptools'],
     zip_safe=True,

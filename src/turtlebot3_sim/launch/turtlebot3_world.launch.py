@@ -41,7 +41,7 @@ def generate_launch_description():
     world = os.path.join(
     get_package_share_directory('turtlebot3_sim'),
     'worlds',
-    'big_supermarket.world')
+    'another_mock_supermarket.world')
 
     gzserver_cmd = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(

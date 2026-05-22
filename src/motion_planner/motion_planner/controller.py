@@ -122,13 +122,23 @@ class Controller(Node):
             return p
 
         self.item_waypoints = {
-            'apple': create_pose(-4.62, 4.42),
-            'bottle': create_pose(1.72, 3.77),
-            'book': create_pose(1.32, -0.759),
-            'cup': create_pose(-4.6, 0.0),
-            'doll': create_pose(-5.71, -5.19),
-            'eggs': create_pose(0.72, -5.84)
+            'apple': create_pose(0.813, -11.9),
+            'bottle': create_pose(-1.98, -11.2),
+            'book': create_pose(-4.12, -8.81),
+            'cup': create_pose(-7.1, -11.3),
+            'doll': create_pose(-9.28, -8.6),
+            'eggs': create_pose(-10.7, -10.5)
         }
+
+        # big supermarket
+        # self.item_waypoints = {
+        #     'apple': create_pose(-4.62, 4.42),
+        #     'bottle': create_pose(1.72, 3.77),
+        #     'book': create_pose(1.32, -0.759),
+        #     'cup': create_pose(-4.6, 0.0),
+        #     'doll': create_pose(-5.71, -5.19),
+        #     'eggs': create_pose(0.72, -5.84)
+        # }
 
         self.status_pub = self.create_publisher(
             String, 
