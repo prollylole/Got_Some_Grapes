@@ -129,10 +129,12 @@ class GuiNode(Node):
     # ---------------- OBJECT SELECTION ----------------
     def choose_object(self, obj_name, button):
         demand_text = self.ui.demand_combo.currentText()
+        upsell_text = self.ui.upsell_combo.currentText()
 
         demand_level = demand_text.split()[-1]
+        upsell_level = upsell_text.split()[-1]
 
-        formatted_name = f"{obj_name}:{demand_level}"
+        formatted_name = f"{obj_name}:{demand_level}:{upsell_level}"
 
         # ensure we don't add the exact same object and priority combo twice
         if formatted_name in self.selected_objects:

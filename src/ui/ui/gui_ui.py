@@ -96,12 +96,16 @@ class GUI(QWidget):
         # ---------------- PRIORITY DROPDOWNS ----------------
         self.demand_combo = QComboBox()
         self.demand_combo.addItems(["Demand: 1", "Demand: 2", "Demand: 3"])
+
+        self.upsell_combo = QComboBox()
+        self.upsell_combo.addItems(["Upsell: None", "Upsell: 1", "Upsell: 2", "Upsell: 3"])
     
         # RIGHT PANEL (object selection)
         right_layout = QGridLayout()
         self.obj_label = QLabel("Pick the objects you want: ")
 
         right_layout.addWidget(self.demand_combo, 0, 0)
+        right_layout.addWidget(self.upsell_combo, 0, 1)
         right_layout.addWidget(self.obj_label, 1, 0, 1, 2)
         right_layout.addWidget(self.obj1, 2, 0)
         right_layout.addWidget(self.obj2, 2, 1)
