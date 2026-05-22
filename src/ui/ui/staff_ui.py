@@ -18,7 +18,7 @@ class StaffGUI(QWidget):
         self.mode = "normal"
 
         self.setWindowTitle("Staff Control Panel")
-        self.setFixedSize(700, 500)
+        self.setFixedSize(700, 600)
 
         # ---------------- STATUS ----------------
         self.status = QLabel("Status: STOPPED")
