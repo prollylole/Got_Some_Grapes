@@ -19,6 +19,8 @@
   <depend>geometry_msgs</depend>
   <depend>nav_msgs</depend>
   <depend>sensor_msgs</depend>
+  <depend>rclpy</depend>
+  <depend>cv_bridge</depend>
 
   <!-- TF / robot state -->
   <depend>tf2_ros</depend>

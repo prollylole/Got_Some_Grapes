@@ -254,6 +254,8 @@ class StaffGUI(QWidget):
         if action == stocked_action:
             self.stock_items_layout.removeWidget(button)
             button.deleteLater()
+        
+            self.out_of_stock_items.discard(button.text().lower().strip())
 
             self.out_of_stock_items.discard(button.text().lower().strip())
 

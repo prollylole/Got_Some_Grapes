@@ -15,6 +15,7 @@
   <depend>geometry_msgs</depend>
   <depend>nav_msgs</depend>    <!-- if subscribing /map, /amcl_pose -->
   <depend>sensor_msgs</depend>
+  <depend>perception_interfaces</depend>
 
   <!-- If using PyQt or Tkinter, install system packages (PyQt via pip apt) -->
   <export>
