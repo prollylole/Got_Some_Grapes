@@ -42,8 +42,8 @@ class GUI(QWidget):
         self.obj2 = QPushButton("Bottle")
         self.obj3 = QPushButton("Cup")
         self.obj4 = QPushButton("Book")
-        self.obj5 = QPushButton("Doll")
-        self.obj6 = QPushButton("Eggs")
+        self.obj5 = QPushButton("Banana")
+        self.obj6 = QPushButton("Raspberry")
 
         self.obj1.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.obj2.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -65,10 +65,10 @@ class GUI(QWidget):
             lambda pos: self.show_context_menu(pos, "book", self.obj4)
         )
         self.obj5.customContextMenuRequested.connect(
-            lambda pos: self.show_context_menu(pos, "doll", self.obj5)
+            lambda pos: self.show_context_menu(pos, "banana", self.obj5)
         )
         self.obj6.customContextMenuRequested.connect(
-            lambda pos: self.show_context_menu(pos, "eggs", self.obj6)
+            lambda pos: self.show_context_menu(pos, "raspberry", self.obj6)
         )
 
         # ---------------- START/STOP BUTTONS ----------------
