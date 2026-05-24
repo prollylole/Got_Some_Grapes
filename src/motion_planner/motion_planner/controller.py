@@ -121,23 +121,13 @@ class Controller(Node):
             p.orientation.w = 1.0
             return p
 
-        # self.item_waypoints = {
-        #     'apple': create_pose(0.813, -11.9),
-        #     'bottle': create_pose(-1.98, -11.2),
-        #     'book': create_pose(-4.12, -8.81),
-        #     'cup': create_pose(-7.1, -11.3),
-        #     'doll': create_pose(-9.28, -8.6),
-        #     'eggs': create_pose(-10.7, -10.5)
-        # }
-
-        #Harrsha waypoints
         self.item_waypoints = {
-            'apple': create_pose(-1.71, 2.91),
-            'bottle': create_pose(-1.22,-7.46),
-            'book': create_pose(0.77, -7.53),
-            'cup': create_pose(1.22, -2.34),
-            'banana': create_pose(0.135, 5.33),
-            'raspberry': create_pose(-1.64, -4.35)
+            'apple': create_pose(0.813, -11.9),
+            'bottle': create_pose(-1.98, -11.2),
+            'book': create_pose(-4.12, -8.81),
+            'cup': create_pose(-7.1, -11.3),
+            'doll': create_pose(-9.28, -8.6),
+            'eggs': create_pose(-10.7, -10.5)
         }
 
         # big supermarket
