@@ -108,6 +108,9 @@ class StaffNode(Node):
         ))
 
     def publish_upsell_product(self, product):
+        if product == "Please select Upsell Item":
+            return  # Do not publish if no valid product is selected
+        
         msg = String()
         msg.data = product
         self.upsell_pub.publish(msg)
