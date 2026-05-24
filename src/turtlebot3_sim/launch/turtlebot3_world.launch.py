@@ -31,8 +31,8 @@ def generate_launch_description():
     pkg_gazebo_ros = get_package_share_directory('gazebo_ros')
 
     use_sim_time = LaunchConfiguration('use_sim_time', default='true')
-    x_pose = LaunchConfiguration('x_pose', default='-1.399425')
-    y_pose = LaunchConfiguration('y_pose', default='-3.969185')
+    x_pose = LaunchConfiguration('x_pose', default='0')
+    y_pose = LaunchConfiguration('y_pose', default='0.7')
     z_pose = LaunchConfiguration('z_pose', default='0.007903')  
     roll = LaunchConfiguration('roll', default='-0.000002')
     pitch = LaunchConfiguration('pitch', default='0.006298')
@@ -41,7 +41,7 @@ def generate_launch_description():
     world = os.path.join(
     get_package_share_directory('turtlebot3_sim'),
     'worlds',
-    'another_mock_supermarket.world')
+    'coloured_mock.world')
 
     gzserver_cmd = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
