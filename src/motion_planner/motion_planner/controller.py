@@ -13,7 +13,7 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 
 from sensor_msgs.msg import LaserScan, Image
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import PoseArray, PoseStamped, Pose
+from geometry_msgs.msg import PoseArray, PoseStamped, Pose, Twist
 from visualization_msgs.msg import MarkerArray, Marker
 from std_msgs.msg import Float64
 from builtin_interfaces.msg import Duration
@@ -21,6 +21,7 @@ from action_msgs.msg import GoalStatus
 from std_msgs.msg import Bool, String
 from nav2_msgs.action import NavigateToPose, ComputePathToPose
 from perception_interfaces.srv import DetectColour
+from tf2_ros import Buffer, TransformListener
 
 import cv_bridge
 
@@ -54,6 +55,10 @@ class Controller(Node):
         self.goal_action_name = self.get_parameter('goal_action_name').value
         self.declare_parameter('navigate_to_pose_action_name', '/navigate_to_pose')
         self.navigate_to_pose_action_name = self.get_parameter('navigate_to_pose_action_name').value
+
+        # tf2 listener
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
 
         # Subcriptions
         self.laser_sub = self.create_subscription(
@@ -121,39 +126,54 @@ class Controller(Node):
         self.object_to_colour = {
             'apple' : 'red',
             'bottle': 'blue',
-            'cup': 'green',
             'book': 'yellow',
-            'doll': 'red',
-            'eggs': 'yellow'
+            'cup': 'green',
+            'banana': 'red',
+            'raspberry': 'yellow'
         }
 
-        def create_pose(x, y):
+        def create_pose(x, y, yaw=0.0):
             p = Pose()
             p.position.x = x
             p.position.y = y
             p.position.z = 0.0
-            p.orientation.w = 1.0
+            
+            cy = math.cos(yaw * 0.5)
+            sy = math.sin(yaw * 0.5)
+            p.orientation.x = 0.0
+            p.orientation.y = 0.0
+            p.orientation.z = sy
+            p.orientation.w = cy
             return p
 
         # another_mock_supermarket
         # self.item_waypoints = {
-        #     'apple': create_pose(0.813, -11.9),
-        #     'bottle': create_pose(-1.98, -11.2),
-        #     'book': create_pose(-4.12, -8.81),
-        #     'cup': create_pose(-7.1, -11.3),
-        #     'doll': create_pose(-9.28, -8.6),
-        #     'eggs': create_pose(-10.7, -10.5)
+        #     'banana': create_pose(1.38, -11.6, 1.57),
+        #     'bottle': create_pose(-1.98, -11.2, 0.0),
+        #     'book': create_pose(-4.12, -8.81, -3.14159),
+        #     'cup': create_pose(-7.1, -11.3, 0.0),
+        #     'apple': create_pose(-9.28, -8.6, -3.14159),
+        #     'raspberry': create_pose(-10.7, -10.5, -1.57)
         # }
-
-        # big supermarket
+        # fix 90 degree turns 
         self.item_waypoints = {
-            'apple': create_pose(-4.62, 4.42),
-            'bottle': create_pose(4.78, -0.155),
-            'book': create_pose(3.34, 1.18),
-            'cup': create_pose(1.67, 0.197),
-            'doll': create_pose(0.89, 1.6),
-            'eggs': create_pose(-0.428, 0.611)
+            'banana': create_pose(1.38, -11.6, 0.0),
+            'bottle': create_pose(-1.98, -11.2, -1.57),
+            'book': create_pose(-4.12, -8.81, 1.57),
+            'cup': create_pose(-7.1, -11.3, -1.57),
+            'apple': create_pose(-9.28, -8.6, 1.57),
+            'raspberry': create_pose(-10.7, -10.5, 3.14159)
         }
+
+        # 3rd supermarket
+        # self.item_waypoints = {
+        #     'banana': create_pose(6.23, -1.17, 1.57),
+        #     'bottle': create_pose(4.53, -0.182, 0.0),
+        #     'book': create_pose(3.24, 1.18, -3.14159),
+        #     'cup': create_pose(1.62, 0.197, 0.0),
+        #     'apple': create_pose(0.592, 1.57, -3.14159),
+        #     'raspberry': create_pose(-0.428, 0.611, -1.57)
+        # }
 
         self.status_pub = self.create_publisher(
             String, 
@@ -178,6 +198,7 @@ class Controller(Node):
         self.status_pub = self.create_publisher(String, 'robot_status', 10)
         self.item_availability_pub = self.create_publisher(Bool, '/item_availability', 10)
         self.out_of_stock_pub = self.create_publisher(String, '/out_of_stock', 10)
+        self.cmd_vel_pub = self.create_publisher(Twist, '/cmd_vel', 10)
         
         # continue/pause button 
         self.waiting_for_continue = False
@@ -300,9 +321,59 @@ class Controller(Node):
             # start new thread async to call perception service and avoid blocking navigation
             threading.Thread(target=self.check_item_availability_async, args=(item_name,), daemon=True).start()
 
+    def get_yaw(self, orientation):
+        siny_cosp = 2 * (orientation.w * orientation.z + orientation.x * orientation.y)
+        cosy_cosp = 1 - 2 * (orientation.y * orientation.y + orientation.z * orientation.z)
+        return math.atan2(siny_cosp, cosy_cosp)
+
+    def rotate_to_yaw(self, target_yaw):
+        self.get_logger().info(f"Rotating to face wall at yaw: {target_yaw:.2f}")
+        twist = Twist()
+        
+        while rclpy.ok() and getattr(self, 'is_running', False):
+            if math.isnan(self.current_pose.position.x):
+                time.sleep(0.1)
+                continue
+                
+            current_yaw = self.get_yaw(self.current_pose.orientation)
+            diff = target_yaw - current_yaw
+            diff = (diff + math.pi) % (2 * math.pi) - math.pi
+            
+            if abs(diff) < 0.1:
+                break
+                
+            angular_speed = 1.0 * diff
+            if angular_speed > 0.5:
+                angular_speed = 0.5
+            elif angular_speed < -0.5:
+                angular_speed = -0.5
+            elif angular_speed > 0 and angular_speed < 0.1:
+                angular_speed = 0.1
+            elif angular_speed < 0 and angular_speed > -0.1:
+                angular_speed = -0.1
+                
+            twist.angular.z = angular_speed
+            self.cmd_vel_pub.publish(twist)
+            time.sleep(0.05)
+            
+        stop_twist = Twist()
+        self.cmd_vel_pub.publish(stop_twist)
+        self.get_logger().info("Sent /cmd_vel 0 to stop completely.")
+        time.sleep(1.0)
+
     def check_item_availability_async(self, item_name):
         self.waiting_for_continue = True
         try:
+            time.sleep(0.5)
+            
+            target_yaw = 0.0
+            for item in self.pending_items:
+                if item['name'] == item_name:
+                    target_yaw = self.get_yaw(item['pose'].orientation)
+                    break
+            
+            self.rotate_to_yaw(target_yaw)
+            
             self.get_logger().info(f"Scanning for item: {item_name}")
 
             expected_colour = self.object_to_colour.get(item_name)
@@ -374,8 +445,24 @@ class Controller(Node):
         self.last_scan = msg
         self.laser_received = True 
 
+    # reads up transform from odom to map to match the current and ideal pose and orientation
+    # try linking the map frame to base_footprint otherwise try base_link frame
     def odom_callback(self, msg):
-        self.current_pose = msg.pose.pose
+        try:
+            t = self.tf_buffer.lookup_transform('map', 'base_footprint', rclpy.time.Time())
+            self.current_pose.position.x = t.transform.translation.x
+            self.current_pose.position.y = t.transform.translation.y
+            self.current_pose.position.z = t.transform.translation.z
+            self.current_pose.orientation = t.transform.rotation
+        except Exception:
+            try:
+                t = self.tf_buffer.lookup_transform('map', 'base_link', rclpy.time.Time())
+                self.current_pose.position.x = t.transform.translation.x
+                self.current_pose.position.y = t.transform.translation.y
+                self.current_pose.position.z = t.transform.translation.z
+                self.current_pose.orientation = t.transform.rotation
+            except Exception:
+                self.current_pose = msg.pose.pose
 
     def continue_callback(self, msg):
         if msg.data == True and self.waiting_for_continue:

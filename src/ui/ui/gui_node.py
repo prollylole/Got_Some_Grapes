@@ -200,11 +200,11 @@ class GuiNode(Node):
         self.update_cart_display()
 
         buttons = [
-            ("apple", self.ui.obj1),
+            ("banana", self.ui.obj1),
             ("bottle", self.ui.obj2),
-            ("cup", self.ui.obj3),
-            ("book", self.ui.obj4),
-            ("banana", self.ui.obj5),
+            ("book", self.ui.obj3),
+            ("cup", self.ui.obj4),
+            ("apple", self.ui.obj5),
             ("raspberry", self.ui.obj6)
         ]
 
