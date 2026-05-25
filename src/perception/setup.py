@@ -26,6 +26,8 @@ setup(
     'console_scripts': [
         'aruco_node = perception.aruco_node:main',
         'ai_vision_node = perception.ai_vision_node:main',
+        'colour_batch = perception.ColourBatch:main',
+        'colour_service_node = perception.colour_service_node:main',
     ],
     }
 )

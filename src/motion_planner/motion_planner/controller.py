@@ -3,6 +3,9 @@
 import math
 import cv2
 import rclpy
+import threading
+import time
+
 from rclpy.node import Node
 from rclpy.action import ActionClient
 from rclpy.executors import MultiThreadedExecutor
@@ -17,6 +20,7 @@ from builtin_interfaces.msg import Duration
 from action_msgs.msg import GoalStatus
 from std_msgs.msg import Bool, String
 from nav2_msgs.action import NavigateToPose, ComputePathToPose
+from perception_interfaces.srv import DetectColour
 
 import cv_bridge
 
@@ -112,6 +116,16 @@ class Controller(Node):
         self.is_running = False
         self.mode = "normal"
         self.pending_items = []
+        self.checking_item = False
+
+        self.object_to_colour = {
+            'apple' : 'red',
+            'bottle': 'blue',
+            'cup': 'green',
+            'book': 'yellow',
+            'doll': 'red',
+            'eggs': 'yellow'
+        }
 
         def create_pose(x, y):
             p = Pose()
@@ -121,24 +135,25 @@ class Controller(Node):
             p.orientation.w = 1.0
             return p
 
-        self.item_waypoints = {
-            'apple': create_pose(0.813, -11.9),
-            'bottle': create_pose(-1.98, -11.2),
-            'book': create_pose(-4.12, -8.81),
-            'cup': create_pose(-7.1, -11.3),
-            'doll': create_pose(-9.28, -8.6),
-            'eggs': create_pose(-10.7, -10.5)
-        }
+        # another_mock_supermarket
+        # self.item_waypoints = {
+        #     'apple': create_pose(0.813, -11.9),
+        #     'bottle': create_pose(-1.98, -11.2),
+        #     'book': create_pose(-4.12, -8.81),
+        #     'cup': create_pose(-7.1, -11.3),
+        #     'doll': create_pose(-9.28, -8.6),
+        #     'eggs': create_pose(-10.7, -10.5)
+        # }
 
         # big supermarket
-        # self.item_waypoints = {
-        #     'apple': create_pose(-4.62, 4.42),
-        #     'bottle': create_pose(1.72, 3.77),
-        #     'book': create_pose(1.32, -0.759),
-        #     'cup': create_pose(-4.6, 0.0),
-        #     'doll': create_pose(-5.71, -5.19),
-        #     'eggs': create_pose(0.72, -5.84)
-        # }
+        self.item_waypoints = {
+            'apple': create_pose(-4.62, 4.42),
+            'bottle': create_pose(4.78, -0.155),
+            'book': create_pose(3.34, 1.18),
+            'cup': create_pose(1.67, 0.197),
+            'doll': create_pose(0.89, 1.6),
+            'eggs': create_pose(-0.428, 0.611)
+        }
 
         self.status_pub = self.create_publisher(
             String, 
@@ -156,19 +171,14 @@ class Controller(Node):
             10
         ) 
 
-        # self.image_sub = self.create_subscription(
-        #     Image,
-        #     '/camera/image',
-        #     self.image_callback,
-        #     5
-        # )
-
         # Publishers
         self.marker_pub = self.create_publisher(MarkerArray, '/visualization_marker', 10)
         self.mission_progress_pub = self.create_publisher(Float64, '/mission_progress', 10)
         self.mission_distance_pub = self.create_publisher(String, '/mission_distance', 10)
         self.status_pub = self.create_publisher(String, 'robot_status', 10)
-
+        self.item_availability_pub = self.create_publisher(Bool, '/item_availability', 10)
+        self.out_of_stock_pub = self.create_publisher(String, '/out_of_stock', 10)
+        
         # continue/pause button 
         self.waiting_for_continue = False
 
@@ -197,6 +207,13 @@ class Controller(Node):
             '/compute_path_to_pose',
             callback_group=self.action_cb_group
         )
+
+        self.detect_client = self.create_client(
+            DetectColour,
+            '/detect_colour',
+            callback_group=self.action_cb_group
+        )
+        
         self.is_calculating = False
         
         self.waypoints = []
@@ -258,15 +275,14 @@ class Controller(Node):
                     dt = (now - self.stuck_anchor_time).nanoseconds / 1e9
                     if dt > 5.0:
                         is_stuck = True
-
-        # If within 1.0 meters OR stuck for > 5 seconds and robot still processing waypoint 
-        # then consider the waypoint reached
-        if (dist < 1.0 or is_stuck) and not self.waiting_for_continue:    
+        
+        # if within 0.3m or stuck for > 15s 
+        if (dist < 0.3 or is_stuck) and not self.waiting_for_continue and not self.checking_item:
             if is_stuck:
-                self.get_logger().info(f"Robot stuck for >5s (moved <20cm). Assuming Waypoint {self.current_goal_idx + 1} reached!")
+                self.get_logger().info(f"Robot stuck near goal for >15s (dist: {dist:.2f}m). Starting automated item check.")
             else:
-                self.get_logger().info(f"Waypoint {self.current_goal_idx + 1} reached! Pausing for continue button")
-                
+                self.get_logger().info(f"Waypoint {self.current_goal_idx + 1} reached! Starting automated item check.")
+
             self.stuck_anchor_pos = None # Reset for the next run
             
             # Cancel the active Nav2 driving goal so the robot actually stops moving!
@@ -276,21 +292,84 @@ class Controller(Node):
             # Formally register this segment's distance as completed
             if self.current_goal_idx < len(self.segment_distances):
                 self.completed_mission_distance += self.segment_distances[self.current_goal_idx]
+                
+            # flag checking item availability
+            self.checking_item = True
+            item_name = self.pending_items[self.current_goal_idx]['name']
 
-            # Pause until continue callback is triggered
-            self.manual_advance = True 
+            # start new thread async to call perception service and avoid blocking navigation
+            threading.Thread(target=self.check_item_availability_async, args=(item_name,), daemon=True).start()
+
+    def check_item_availability_async(self, item_name):
+        self.waiting_for_continue = True
+        try:
+            self.get_logger().info(f"Scanning for item: {item_name}")
+
+            expected_colour = self.object_to_colour.get(item_name)
+            if not expected_colour:
+                self.get_logger().warn(f"No colour mapping for '{item_name}'. Marking out of stock.")
+                self.publish_item_out_of_stock(item_name)
+                return
+            
+            if not self.detect_client.wait_for_service(timeout_sec=5.0):
+                self.get_logger().error("Perception service /detect_colour not available!")
+                self.publish_item_out_of_stock(item_name)
+                return
+
+            # request perception data from item_name
+            req = DetectColour.Request()
+            req.expected_colour = expected_colour
+
+            # broadcast service request to colour service node to detect colour 
+            # colour_service_node will run openCV processing HSV and send response to res
+            future = self.detect_client.call_async(req)
+
+            # start timer after when request is sent
+            start_time = time.time()
+            # looping until request is done within 15s otherwise send timeout
+            while rclpy.ok() and not future.done():
+                if time.time() - start_time > 15.0:
+                    self.get_logger().error(f"Timeout waiting for /detect_colour for {item_name}")
+                    self.publish_item_out_of_stock(item_name)
+                    return
+                time.sleep(0.1)
+            
+            # if camera failed or timeout then mark as out of stock
+            if not future.done() or future.result() is None:
+                self.get_logger().error(f"Failed to get result for {item_name}")
+                self.publish_item_out_of_(item_name)
+                return
+            
+            res = future.result()
+            item_missing = (not res.success or res.missing_flag or not res.colour_present)
+
+            if item_missing:
+                self.get_logger().info(f"{item_name} is OUT OF STOCK.")
+                self.publish_item_out_of_stock(item_name)
+            else:
+                self.get_logger().info(f"{item_name} is AVAILABLE.")
+                msg = Bool()
+                msg.data = True
+                self.item_availability_pub.publish(msg)
+            
+        finally:
+            # reset checking item flag 
+            self.checking_item = False
             self.waiting_for_continue = True
 
-            # Inform GUI waypoint arrived
-            status_msg = String()
-            status_msg.data = "Arrived. Scanning items..."
-            self.status_pub.publish(status_msg)
+            msg = Bool()
+            msg.data = False
+            self.continue_pub.publish(msg)
+            
+    def publish_item_out_of_stock(self, item_name):
+        msg = Bool()
+        msg.data = False
+        self.item_availability_pub.publish(msg)
 
-            # Inform GUI to enable the Continue button!
-            cont_msg = Bool()
-            cont_msg.data = False
-            self.continue_pub.publish(cont_msg)
-
+        msg_str = String()
+        msg_str.data = item_name
+        self.out_of_stock_pub.publish(msg_str)
+                
     def laser_callback(self, msg):
         self.last_scan = msg
         self.laser_received = True 

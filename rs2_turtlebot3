@@ -12,7 +12,7 @@ ros2 run turtlebot3_gazebo turtlebot3_drive
 
 -----------running robot--------------
 ssh ubuntu@192.168.0.2xx
-export ROS_DOMAIN_ID=<your_domain_id>
+export ROS_DOMAIN_ID=7
 
 echo "export ROS_DOMAIN_ID=<your_domain_id>" >> ~/.bashrc
 echo "export TURTLEBOT3_MODEL=waffle_pi" >> ~/.bashrc
