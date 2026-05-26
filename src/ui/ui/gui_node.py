@@ -129,12 +129,10 @@ class GuiNode(Node):
     # ---------------- OBJECT SELECTION ----------------
     def choose_object(self, obj_name, button):
         demand_text = self.ui.demand_combo.currentText()
-        upsell_text = self.ui.upsell_combo.currentText()
 
         demand_level = demand_text.split()[-1]
-        upsell_level = upsell_text.split()[-1]
 
-        formatted_name = f"{obj_name}:{demand_level}:{upsell_level}"
+        formatted_name = f"{obj_name}:{demand_level}"
 
         # ensure we don't add the exact same object and priority combo twice
         if formatted_name in self.selected_objects:
@@ -181,12 +179,12 @@ class GuiNode(Node):
             self.ui.cart_items_layout.addWidget(label)
             return
 
-        # select demand and upsell level
+        # select demand level
         for obj in self.selected_objects:
             parts = obj.split(':')
             display_name = parts[0].capitalize()
-            if len(parts) == 3:
-                display_name += f" (D:{parts[1]} U:{parts[2]})"
+            if len(parts) == 2:
+                display_name += f" (D:{parts[1]})"
                 
             label = QLabel(display_name)
             label.setStyleSheet(
@@ -200,11 +198,11 @@ class GuiNode(Node):
         self.update_cart_display()
 
         buttons = [
-            ("banana", self.ui.obj1),
+            ("apple", self.ui.obj1),
             ("bottle", self.ui.obj2),
-            ("book", self.ui.obj3),
-            ("cup", self.ui.obj4),
-            ("apple", self.ui.obj5),
+            ("cup", self.ui.obj3),
+            ("book", self.ui.obj4),
+            ("banana", self.ui.obj5),
             ("raspberry", self.ui.obj6)
         ]
 

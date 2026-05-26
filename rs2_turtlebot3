@@ -192,6 +192,14 @@ ros2 topic pub /continue std_msgs/msg/Bool "{data: false}" --once
 ros2 run ui gui_node
 
 
+
+--debug camera--
+pkill -f camera
+pkill -f libcamera
+sudo fuser -k /dev/video0
+
+
+
 SLAM
 roslaunch turtlebot3_slam rosturtlebot3_slam.launch slam_methods:=gmapping
 run rviz and gazebo

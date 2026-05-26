@@ -118,18 +118,25 @@ class Controller(Node):
             self.mode_callback,
             10)
 
+        self.upsell_product_sub = self.create_subscription(
+            String,
+            '/upsell_product',
+            self.upsell_product_callback,
+            10)
+
         self.is_running = False
         self.mode = "normal"
+        self.current_upsell_product = None
         self.pending_items = []
         self.checking_item = False
 
         self.object_to_colour = {
             'apple' : 'red',
             'bottle': 'blue',
-            'book': 'yellow',
             'cup': 'green',
-            'banana': 'red',
-            'raspberry': 'yellow'
+            'book': 'yellow',
+            'banana': 'yellow',
+            'raspberry': 'red'
         }
 
         def create_pose(x, y, yaw=0.0):
@@ -147,14 +154,6 @@ class Controller(Node):
             return p
 
         # another_mock_supermarket
-        # self.item_waypoints = {
-        #     'banana': create_pose(1.38, -11.6, 1.57),
-        #     'bottle': create_pose(-1.98, -11.2, 0.0),
-        #     'book': create_pose(-4.12, -8.81, -3.14159),
-        #     'cup': create_pose(-7.1, -11.3, 0.0),
-        #     'apple': create_pose(-9.28, -8.6, -3.14159),
-        #     'raspberry': create_pose(-10.7, -10.5, -1.57)
-        # }
         # fix 90 degree turns 
         self.item_waypoints = {
             'banana': create_pose(1.38, -11.6, 0.0),
@@ -165,6 +164,16 @@ class Controller(Node):
             'raspberry': create_pose(-10.7, -10.5, 3.14159)
         }
 
+        #Harrsha waypoints
+        # self.item_waypoints = {
+        #     'apple': create_pose(-1.59, 1.60),
+        #     'bottle': create_pose(0.58, -7.47),
+        #     'book': create_pose(0.25, 5.29),
+        #     'cup': create_pose(1.11, -0.41),
+        #     'banana': create_pose(2.35, 3.35),
+        #     'raspberry': create_pose(-1.60, -6.71)
+        # }
+
         # 3rd supermarket
         # self.item_waypoints = {
         #     'banana': create_pose(6.23, -1.17, 1.57),
@@ -174,6 +183,26 @@ class Controller(Node):
         #     'apple': create_pose(0.592, 1.57, -3.14159),
         #     'raspberry': create_pose(-0.428, 0.611, -1.57)
         # }
+        # fix 90 degree turns
+        # self.item_waypoints = {
+        #     'banana': create_pose(6.23, -1.17, 0.0),
+        #     'bottle': create_pose(4.53, -0.182, -1.57),
+        #     'book': create_pose(3.24, 1.18, 1.57),
+        #     'cup': create_pose(1.62, 0.197, -1.57),
+        #     'apple': create_pose(0.592, 1.57, 1.57),
+        #     'raspberry': create_pose(-0.428, 0.611, 3.14159)
+        # }
+
+        # small space waypoints
+        # self.item_waypoints = {
+        #     'banana': create_pose(6.23, -1.17, 0.0),
+        #     'bottle': create_pose(4.53, -0.182, -1.57),
+        #     'book': create_pose(1.6, 0.4, 1.57),
+        #     'cup': create_pose(1.62, 0.197, -1.57),
+        #     'apple': create_pose(1.68, 1.28, 1.57),
+        #     'raspberry': create_pose(-0.428, 0.611, 3.14159)
+        # }
+
 
         self.status_pub = self.create_publisher(
             String, 
@@ -342,15 +371,20 @@ class Controller(Node):
             if abs(diff) < 0.1:
                 break
                 
-            angular_speed = 1.0 * diff
-            if angular_speed > 0.5:
-                angular_speed = 0.5
-            elif angular_speed < -0.5:
-                angular_speed = -0.5
-            elif angular_speed > 0 and angular_speed < 0.1:
-                angular_speed = 0.1
-            elif angular_speed < 0 and angular_speed > -0.1:
-                angular_speed = -0.1
+            # Proportional gain for faster turning
+            angular_speed = 2.0 * diff
+            
+            # Higher max speed when far away
+            if angular_speed > 1.5:
+                angular_speed = 1.5
+            elif angular_speed < -1.5:
+                angular_speed = -1.5
+                
+            # Minimum speed to prevent stalling when close
+            if angular_speed > 0 and angular_speed < 0.15:
+                angular_speed = 0.15
+            elif angular_speed < 0 and angular_speed > -0.15:
+                angular_speed = -0.15
                 
             twist.angular.z = angular_speed
             self.cmd_vel_pub.publish(twist)
@@ -360,7 +394,7 @@ class Controller(Node):
         self.cmd_vel_pub.publish(stop_twist)
         self.get_logger().info("Sent /cmd_vel 0 to stop completely.")
         time.sleep(1.0)
-
+            
     def check_item_availability_async(self, item_name):
         self.waiting_for_continue = True
         try:
@@ -408,7 +442,7 @@ class Controller(Node):
             # if camera failed or timeout then mark as out of stock
             if not future.done() or future.result() is None:
                 self.get_logger().error(f"Failed to get result for {item_name}")
-                self.publish_item_out_of_(item_name)
+                self.publish_item_out_of_stock(item_name)
                 return
             
             res = future.result()
@@ -496,6 +530,12 @@ class Controller(Node):
         self.mode = msg.data
         self.get_logger().info(f"Controller Mode switched to: {self.mode}")
 
+    def upsell_product_callback(self, msg):
+        self.current_upsell_product = msg.data.lower()
+        self.get_logger().info(f"Upsell product set to: {self.current_upsell_product}")
+        if self.mode == "upsell" and not self.is_running and self.pending_items:
+             self.trigger_recalculation()
+
     def selected_objects_callback(self, msg):
         # cannot add items to cart while mission started
         if self.is_running:
@@ -507,12 +547,11 @@ class Controller(Node):
         self.pending_items.clear()
         items_str = msg.data.split(',') if msg.data else []
 
-        # splitting demand and upsell string from selected object string
-        # name : demand level : upsell level
+        # name : demand level
         for item_str in items_str:
             if not item_str: continue
             parts = item_str.split(':')
-            if len(parts) == 3:
+            if len(parts) == 2:
                 name = parts[0].strip().lower()
 
                 # demand mapping
@@ -522,19 +561,12 @@ class Controller(Node):
                 elif d_level == '2' : demand_val = 10
                 elif d_level == '3' : demand_val = 5
 
-                # upsel mapping
-                u_level = parts[2]
-                upsell_val = 0
-                if u_level == '1' : upsell_val = 12
-                elif u_level == '2' : upsell_val = 8
-                elif u_level == '3' : upsell_val = 4
-
                 if name in self.item_waypoints:
                     self.pending_items.append({
                         'name': name,
                         'pose': self.item_waypoints[name],
                         'demand': demand_val,
-                        'upsell': upsell_val
+                        'upsell': 0
                     })
 
                 else:
@@ -625,7 +657,7 @@ class Controller(Node):
         
         if mode == "upsell":
             a = 1.0
-            b = 0.8
+            b = 15.0
             c = 1.0
             
         results = []
@@ -666,6 +698,33 @@ class Controller(Node):
             sim_pos = Pose().position
             sim_pos.x = 0.0
             sim_pos.y = 0.0
+
+        if self.mode == "upsell" and self.current_upsell_product and self.current_upsell_product in self.item_waypoints:
+            has_upsell = any(item['name'] == self.current_upsell_product for item in remaining)
+            if not has_upsell:
+                upsell_pose = self.item_waypoints[self.current_upsell_product]
+                passes_through = False
+                for item in remaining:
+                    target_pos = item['pose'].position
+                    dist_to_upsell = self.compute_distance(sim_pos, upsell_pose.position)
+                    dist_from_upsell_to_target = self.compute_distance(upsell_pose.position, target_pos)
+                    dist_direct = self.compute_distance(sim_pos, target_pos)
+                    
+                    detour = dist_to_upsell + dist_from_upsell_to_target - dist_direct
+                    if detour < 2.0:
+                        passes_through = True
+                        break
+                        
+                if passes_through:
+                    self.get_logger().info(f"Upsell item '{self.current_upsell_product}' is on the way! Adding to route.")
+                    remaining.append({
+                        'name': self.current_upsell_product,
+                        'pose': upsell_pose,
+                        'demand': 0,
+                        'upsell': 1
+                    })
+                else:
+                    self.get_logger().info(f"Upsell item '{self.current_upsell_product}' is too far (detour >= 2.0m). Skipping.")
             
         if self.current_goal_idx == 0:
             current_from_name = "Robot Start"

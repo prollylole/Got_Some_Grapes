@@ -96,16 +96,12 @@ class GUI(QWidget):
         # ---------------- PRIORITY DROPDOWNS ----------------
         self.demand_combo = QComboBox()
         self.demand_combo.addItems(["Demand: 1", "Demand: 2", "Demand: 3"])
-
-        self.upsell_combo = QComboBox()
-        self.upsell_combo.addItems(["Upsell: None", "Upsell: 1", "Upsell: 2", "Upsell: 3"])
     
         # RIGHT PANEL (object selection)
         right_layout = QGridLayout()
         self.obj_label = QLabel("Pick the objects you want: ")
 
-        right_layout.addWidget(self.demand_combo, 0, 0)
-        right_layout.addWidget(self.upsell_combo, 0, 1)
+        right_layout.addWidget(self.demand_combo, 0, 0, 1, 2)
         right_layout.addWidget(self.obj_label, 1, 0, 1, 2)
         right_layout.addWidget(self.obj1, 2, 0)
         right_layout.addWidget(self.obj2, 2, 1)
@@ -159,7 +155,6 @@ class GUI(QWidget):
         container.addLayout(bottom_layout)
 
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.customContextMenuRequested.connect(self.show_global_menu)
 
         self.setLayout(container)
 
@@ -258,32 +253,3 @@ class GUI(QWidget):
 
         if action == remove_action:
             self.node.remove_object(target_obj, button)
-
-    def show_global_menu(self, pos):
-        widget = self.childAt(pos)
-
-        # Ignore if clicking a button (so button menus still work)
-        from PyQt6.QtWidgets import QPushButton
-        if isinstance(widget, QPushButton):
-            return
-
-        menu = QMenu(self)
-
-        normal_action = menu.addAction("Normal Mode")
-        upsell_action = menu.addAction("Upsell Mode")
-
-        # Show checkmark on current mode
-        normal_action.setCheckable(True)
-        upsell_action.setCheckable(True)
-
-        normal_action.setChecked(self.mode == "normal")
-        upsell_action.setChecked(self.mode == "upsell")
-
-        action = menu.exec(self.mapToGlobal(pos))
-
-        if action == normal_action:
-            self.mode = "normal"
-            self.node.publish_mode("normal")
-        elif action == upsell_action:
-            self.mode = "upsell"
-            self.node.publish_mode("upsell")
