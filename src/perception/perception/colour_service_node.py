@@ -222,6 +222,7 @@ class ColourServiceNode(Node):
         self.declare_parameter('pixel_threshold', 1000)
         self.declare_parameter('required_detections', 3)
         self.declare_parameter('capture_timeout_sec', 5.0)
+        self.declare_parameter('capture_retry_attempts', 3)
         self.declare_parameter('show_debug_windows', True)
 
         self.camera_topic = self.get_parameter('camera_topic').get_parameter_value().string_value
@@ -230,6 +231,7 @@ class ColourServiceNode(Node):
         self.pixel_threshold = self.get_parameter('pixel_threshold').get_parameter_value().integer_value
         self.required_detections = self.get_parameter('required_detections').get_parameter_value().integer_value
         self.capture_timeout_sec = self.get_parameter('capture_timeout_sec').get_parameter_value().double_value
+        self.capture_retry_attempts = self.get_parameter('capture_retry_attempts').get_parameter_value().integer_value
         self.show_debug_windows = self.get_parameter('show_debug_windows').get_parameter_value().bool_value
 
         self.bridge = CvBridge()
@@ -271,6 +273,13 @@ class ColourServiceNode(Node):
         self.get_logger().info('Colour service node started')
         self.get_logger().info(f'Subscribing to: {self.camera_topic}')
         self.get_logger().info('Service available at: /detect_colour')
+        self.get_logger().info(
+            f'Batch settings: num_frames={self.num_frames}, '
+            f'required_detections={self.required_detections}, '
+            f'capture_timeout_sec={self.capture_timeout_sec}, '
+            f'capture_retry_attempts={self.capture_retry_attempts}, '
+            f'frame_delay={self.frame_delay}'
+        )
 
     def image_callback(self, msg):
         try:
@@ -323,6 +332,34 @@ class ColourServiceNode(Node):
 
         return frames
 
+    def collect_batch_frames_with_retries(self):
+        frames = []
+
+        for attempt in range(1, self.capture_retry_attempts + 1):
+            self.get_logger().info(
+                f'Frame capture attempt {attempt}/{self.capture_retry_attempts}'
+            )
+
+            frames = self.collect_batch_frames()
+
+            if len(frames) >= self.num_frames:
+                self.get_logger().info(
+                    f'Successfully captured {len(frames)}/{self.num_frames} frames '
+                    f'on attempt {attempt}/{self.capture_retry_attempts}.'
+                )
+                return frames
+
+            self.get_logger().warn(
+                f'Only captured {len(frames)}/{self.num_frames} frames '
+                f'on attempt {attempt}/{self.capture_retry_attempts}.'
+            )
+
+            if attempt < self.capture_retry_attempts:
+                self.get_logger().warn('Retrying frame capture...')
+                time.sleep(0.5)
+
+        return frames
+
     def set_error_response(self, response, status):
         response.success = False
         response.colour_present = False
@@ -336,29 +373,30 @@ class ColourServiceNode(Node):
         expected_colour = request.expected_colour.strip().lower()
 
         if expected_colour == "":
-            return self.set_error_response(response, 'Empty colour request.')
+            return self.set_error_response(response, 'REQUEST_ERROR: Empty colour request.')
 
         if expected_colour not in COLOUR_RANGES:
             return self.set_error_response(
                 response,
-                f'Unsupported colour requested: {expected_colour}'
+                f'REQUEST_ERROR: Unsupported colour requested: {expected_colour}'
             )
 
         acquired = self.busy_lock.acquire(blocking=False)
         if not acquired:
-            return self.set_error_response(response, 'Detector is busy.')
+            return self.set_error_response(response, 'BUSY_ERROR: Detector is busy. Please retry.')
 
         try:
             self.get_logger().info(
                 f'Received detect request for colour: {expected_colour}'
             )
 
-            frames = self.collect_batch_frames()
+            frames = self.collect_batch_frames_with_retries()
 
             if len(frames) < self.num_frames:
                 return self.set_error_response(
                     response,
-                    f'Only captured {len(frames)}/{self.num_frames} frames before timeout.'
+                    f'CAMERA_ERROR: Only captured {len(frames)}/{self.num_frames} frames '
+                    f'after {self.capture_retry_attempts} attempt(s).'
                 )
 
             batch_result = inspect_frame_batch(

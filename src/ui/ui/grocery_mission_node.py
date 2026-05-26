@@ -135,7 +135,7 @@ class GroceryMissionNode(Node):
         future = self.detect_client.call_async(request)
 
         start_time = time.time()
-        timeout_sec = 15.0
+        timeout_sec = 35.0
 
         while rclpy.ok() and not future.done():
             elapsed = time.time() - start_time
@@ -175,11 +175,9 @@ class GroceryMissionNode(Node):
 
             if expected_colour is None:
                 self.publish_status(
-                    f'Unknown item "{object_name}". No colour mapping found.'
+                    f'Unknown item "{object_name}". No colour mapping found. Please update object_to_colour.'
                 )
                 self.publish_item_availability(False)
-                self.publish_out_of_stock(object_name)
-                self.current_index += 1
                 return
 
             self.publish_status(
@@ -189,13 +187,13 @@ class GroceryMissionNode(Node):
 
             response = self.call_colour_service(expected_colour)
 
+            # Service did not return at all. This is not the same as the item being missing.
+            # Do not add to out-of-stock and do not move to the next item.
             if response is None:
                 self.publish_status(
-                    f'Could not check {object_name}. Marking as unavailable.'
+                    f'Could not check {object_name}. Perception service did not respond. Please retry.'
                 )
                 self.publish_item_availability(False)
-                self.publish_out_of_stock(object_name)
-                self.current_index += 1
                 return
 
             self.get_logger().info(
@@ -207,11 +205,18 @@ class GroceryMissionNode(Node):
                 f'status="{response.status}"'
             )
 
-            item_missing = (
-                not response.success
-                or response.missing_flag
-                or not response.colour_present
-            )
+            # A failed service response usually means camera/service/busy/request error.
+            # This is not the same as a real out-of-stock result.
+            # Do not add to out-of-stock and do not move to the next item.
+            if not response.success:
+                self.publish_status(
+                    f'Perception error while checking {object_name}: {response.status}. Please retry.'
+                )
+                self.publish_item_availability(False)
+                return
+
+            # If the service ran successfully, then colour_present/missing_flag is a genuine detection result.
+            item_missing = response.missing_flag or not response.colour_present
 
             if item_missing:
                 self.publish_item_availability(False)
