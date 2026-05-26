@@ -106,14 +106,14 @@ class GuiNode(Node):
         return closest, angle
 
     def update_lidar_display(self, distance, angle):
-        self.ui.lidar.setText(f"Closest Distance: {distance:.2f} m")
+        self.ui.lidar.setText(f"Closest Obstacle Distance: {distance:.2f} m")
 
         if distance > 1:
             self.ui.direction.setText("No obstacle")
             return
 
         direction = self.get_direction(angle)
-        self.ui.direction.setText(f"Obstacle Direction: {direction}")
+        self.ui.direction.setText(f"Closest Obstacle Direction: {direction}")
 
     def get_direction(self, angle):
         if 0 <= angle <= 45 or 315 < angle <= 360:

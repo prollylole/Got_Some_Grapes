@@ -21,8 +21,8 @@ class GUI(QWidget):
 
         # ---------------- STATUS LABELS ----------------
         self.status = QLabel("Status: STOPPED")
-        self.lidar = QLabel("Closest Distance: --")
-        self.direction = QLabel("Obstacle Direction: --")
+        self.lidar = QLabel("Closest Obstacle Distance: --")
+        self.direction = QLabel("Closest Obstacle Direction: --")
         self.availability = QLabel("Item Status: Please wait...")
         
         # ---------------- TELEMETRY LABELS ----------------
@@ -125,7 +125,7 @@ class GUI(QWidget):
         self.cart_layout = QVBoxLayout()
         self.cart_layout.setSpacing(5)
 
-        self.cart_label = QLabel("Current Cart")
+        self.cart_label = QLabel("Grocery List:")
         self.cart_label.setStyleSheet(
             "font-size:14px; font-weight:bold; background: none; "
             "border: none; padding: 0; margin: 0;"
