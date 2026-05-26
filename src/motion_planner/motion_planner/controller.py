@@ -657,7 +657,7 @@ class Controller(Node):
         
         if mode == "upsell":
             a = 1.0
-            b = 15.0
+            b = 8.0
             c = 1.0
             
         results = []
@@ -699,48 +699,75 @@ class Controller(Node):
             sim_pos.x = 0.0
             sim_pos.y = 0.0
 
-        if self.mode == "upsell" and self.current_upsell_product and self.current_upsell_product in self.item_waypoints:
-            has_upsell = any(item['name'] == self.current_upsell_product for item in remaining)
-            if not has_upsell:
-                upsell_pose = self.item_waypoints[self.current_upsell_product]
-                passes_through = False
-                for item in remaining:
-                    target_pos = item['pose'].position
-                    dist_to_upsell = self.compute_distance(sim_pos, upsell_pose.position)
-                    dist_from_upsell_to_target = self.compute_distance(upsell_pose.position, target_pos)
-                    dist_direct = self.compute_distance(sim_pos, target_pos)
-                    
-                    detour = dist_to_upsell + dist_from_upsell_to_target - dist_direct
-                    if detour < 2.0:
-                        passes_through = True
-                        break
-                        
-                if passes_through:
-                    self.get_logger().info(f"Upsell item '{self.current_upsell_product}' is on the way! Adding to route.")
-                    remaining.append({
-                        'name': self.current_upsell_product,
-                        'pose': upsell_pose,
-                        'demand': 0,
-                        'upsell': 1
-                    })
-                else:
-                    self.get_logger().info(f"Upsell item '{self.current_upsell_product}' is too far (detour >= 2.0m). Skipping.")
-            
         if self.current_goal_idx == 0:
             current_from_name = "Robot Start"
         else:
             current_from_name = self.pending_items[self.current_goal_idx - 1]['name']
-            
+
         # use current position and pending items to update remaining route using the score formula
         # add best item to sorted_remaining then remove from remaining, repeat until remaining is empty
         # update self.pending_items to be the sorted_remaining
         while remaining:
-            best_item, best_idx, score = await self.calculate_best_next_item(sim_pos, remaining, self.mode, current_from_name)
+            best_item, best_idx, score = await self.calculate_best_next_item(sim_pos, remaining, "normal", current_from_name)
             sorted_remaining.append(best_item)
             sim_pos = best_item['pose'].position
             current_from_name = best_item['name']
             remaining.pop(best_idx)
             
+        if self.mode == "upsell" and self.current_upsell_product and self.current_upsell_product in self.item_waypoints:
+            has_upsell = any(item['name'] == self.current_upsell_product for item in self.pending_items)
+            if not has_upsell:
+                upsell_pose = self.item_waypoints[self.current_upsell_product]
+                
+                orig_sim_pos = self.current_pose.position
+                if math.isnan(orig_sim_pos.x) or math.isnan(orig_sim_pos.y):
+                    orig_sim_pos = Pose().position
+                    orig_sim_pos.x = 0.0
+                    orig_sim_pos.y = 0.0
+                
+                passes_through = False
+                for item in sorted_remaining:
+                    target_pos = item['pose'].position
+                    dist_to_upsell = await self.get_nav2_path_length(orig_sim_pos, upsell_pose.position)
+                    dist_from_upsell_to_target = await self.get_nav2_path_length(upsell_pose.position, target_pos)
+                    dist_direct = await self.get_nav2_path_length(orig_sim_pos, target_pos)
+                    
+                    detour = dist_to_upsell + dist_from_upsell_to_target - dist_direct
+                    if detour < 5.0 or dist_from_upsell_to_target <= 5.0:
+                        passes_through = True
+                        break
+                        
+                if passes_through:
+                    upsell_item = {
+                        'name': self.current_upsell_product,
+                        'pose': upsell_pose,
+                        'demand': 0,
+                        'upsell': 1
+                    }
+
+                    dist_to_upsell = await self.get_nav2_path_length(orig_sim_pos, upsell_pose.position)
+                    is_furthest = True
+                    for item in sorted_remaining:
+                        target_pos = item['pose'].position
+                        dist_to_target = await self.get_nav2_path_length(orig_sim_pos, target_pos)
+                        if dist_to_upsell <= dist_to_target:
+                            is_furthest = False
+                            break
+
+                    if is_furthest:
+                        self.get_logger().info(f"Upsell '{self.current_upsell_product}' is furthest from start. Skipping upsell.")
+                    else:
+                        if len(sorted_remaining) >= 2:
+                            self.get_logger().info(f"Upsell item '{self.current_upsell_product}' is on the way! Squeezing into the middle.")
+                            middle_idx = len(sorted_remaining) // 2
+                            sorted_remaining.insert(middle_idx, upsell_item)
+                        elif len(sorted_remaining) == 1:
+                            self.get_logger().info(f"Upsell '{self.current_upsell_product}' is closer than customer item. Adding to front.")
+                            sorted_remaining.insert(0, upsell_item)
+                else:
+                    self.get_logger().info(f"Upsell item '{self.current_upsell_product}' is too far. Skipping.")
+
+
         new_route_names = [item['name'] for item in sorted_remaining]
 
         # publish the active route to gui
@@ -756,7 +783,17 @@ class Controller(Node):
             self.get_logger().info(f"New Route: {new_str}")
 
         self.pending_items[self.current_goal_idx : ] = sorted_remaining
-        
+        # Ensure internal arrays are the correct size to handle dynamic route length changes (e.g., upsell items)
+        target_len = self.current_goal_idx + len(sorted_remaining)
+        while len(self.waypoints) < target_len:
+            self.waypoints.append(None)
+            self.goals.append(None)
+            self.segment_distances.append(0.0)
+        while len(self.waypoints) > target_len:
+            self.waypoints.pop()
+            self.goals.pop()
+            self.segment_distances.pop()
+            
         # store new ordered goals from sorted_remaining in self.goals for controller
         for i, item in enumerate(sorted_remaining):
             idx = self.current_goal_idx + i

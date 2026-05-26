@@ -109,7 +109,7 @@ class StaffGUI(QWidget):
 
         self.upsell_dropdown = QComboBox()
         self.upsell_dropdown.addItem("Please select Upsell Item")
-        self.upsell_dropdown.addItems(["apple", "bottle", "cup", "book"])
+        self.upsell_dropdown.addItems(["apple", "bottle", "cup", "book", "banana", "blueberry"])
         self.upsell_dropdown.setVisible(False)  # hidden by default
         self.upsell_dropdown.setCurrentIndex(0)
 
