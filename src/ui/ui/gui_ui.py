@@ -3,6 +3,8 @@ from PyQt6.QtWidgets import (
     QWidget, QPushButton, QLabel, QVBoxLayout,
     QHBoxLayout, QGridLayout, QMenu, QComboBox, QProgressBar
 )
+from PyQt6.QtGui import QPixmap
+from PyQt6.QtWidgets import QSizePolicy
 
 
 class GUI(QWidget):
@@ -71,6 +73,15 @@ class GUI(QWidget):
             lambda pos: self.show_context_menu(pos, "raspberry", self.obj6)
         )
 
+        self.map_label = QLabel()
+        self.map_label.setFixedSize(400, 200)
+        self.map_label.setStyleSheet("""
+            border: 2px solid #888;
+            background-color: black;
+        """)
+        self.map_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.map_label.setText("Nav2 Map View")
+
         # ---------------- START/STOP BUTTONS ----------------
         self.start_btn = QPushButton("START")
         self.stop_btn = QPushButton("STOP")
@@ -110,6 +121,12 @@ class GUI(QWidget):
         right_layout.addWidget(self.obj5, 4, 0)
         right_layout.addWidget(self.obj6, 4, 1)
         right_layout.addWidget(self.availability, 5, 0, 1, 2)
+        right_layout.addWidget(self.map_label, 6, 0, 1, 2)
+
+        left_layout.setSpacing(4)
+        left_layout.setContentsMargins(2, 2, 2, 2)
+        left_layout.addStretch(1)
+        main_layout.setVerticalSpacing(6)
 
         main_layout.addLayout(left_layout, 0, 0)
         main_layout.addLayout(right_layout, 0, 1)
