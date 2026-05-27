@@ -136,7 +136,7 @@ class Controller(Node):
             'cup': 'green',
             'book': 'yellow',
             'banana': 'yellow',
-            'raspberry': 'red'
+            'blueberry': 'red'
         }
 
         def create_pose(x, y, yaw=0.0):
@@ -155,24 +155,24 @@ class Controller(Node):
 
         # another_mock_supermarket
         # fix 90 degree turns 
-        self.item_waypoints = {
-            'banana': create_pose(1.38, -11.6, 0.0),
-            'bottle': create_pose(-1.98, -11.2, -1.57),
-            'book': create_pose(-4.12, -8.81, 1.57),
-            'cup': create_pose(-7.1, -11.3, -1.57),
-            'apple': create_pose(-9.28, -8.6, 1.57),
-            'raspberry': create_pose(-10.7, -10.5, 3.14159)
-        }
+        # self.item_waypoints = {
+        #     'banana': create_pose(1.38, -11.6, 0.0),
+        #     'bottle': create_pose(-1.98, -11.2, -1.57),
+        #     'book': create_pose(-4.12, -8.81, 1.57),
+        #     'cup': create_pose(-7.1, -11.3, -1.57),
+        #     'apple': create_pose(-9.28, -8.6, 1.57),
+        #     'blueberry': create_pose(-10.7, -10.5, 3.14159)
+        # }
 
         #Harrsha waypoints
-        # self.item_waypoints = {
-        #     'apple': create_pose(-1.59, 1.60),
-        #     'bottle': create_pose(0.58, -7.47),
-        #     'book': create_pose(0.25, 5.29),
-        #     'cup': create_pose(1.11, -0.41),
-        #     'banana': create_pose(2.35, 3.35),
-        #     'raspberry': create_pose(-1.60, -6.71)
-        # }
+        self.item_waypoints = {
+            'apple': create_pose(-1.59, 1.60),
+            'bottle': create_pose(0.58, -7.47),
+            'book': create_pose(0.25, 5.29),
+            'cup': create_pose(1.11, -0.41),
+            'banana': create_pose(2.35, 3.35),
+            'blueberry': create_pose(-1.60, -6.71)
+        }
 
         # 3rd supermarket
         # self.item_waypoints = {

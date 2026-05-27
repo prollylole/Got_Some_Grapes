@@ -29,7 +29,7 @@ def main(args=None):
     gui.obj3.clicked.connect(lambda: node.choose_object("cup", gui.obj3))
     gui.obj4.clicked.connect(lambda: node.choose_object("book", gui.obj4))
     gui.obj5.clicked.connect(lambda: node.choose_object("banana", gui.obj5))
-    gui.obj6.clicked.connect(lambda: node.choose_object("raspberry", gui.obj6))
+    gui.obj6.clicked.connect(lambda: node.choose_object("blueberry", gui.obj6))
 
     # ---------------- ROS SPIN THREAD ----------------
     Thread(target=rclpy.spin, args=(node,), daemon=True).start()

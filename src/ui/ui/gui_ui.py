@@ -45,7 +45,7 @@ class GUI(QWidget):
         self.obj3 = QPushButton("Cup")
         self.obj4 = QPushButton("Book")
         self.obj5 = QPushButton("Banana")
-        self.obj6 = QPushButton("Raspberry")
+        self.obj6 = QPushButton("Blueberry")
 
         self.obj1.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.obj2.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -70,7 +70,7 @@ class GUI(QWidget):
             lambda pos: self.show_context_menu(pos, "banana", self.obj5)
         )
         self.obj6.customContextMenuRequested.connect(
-            lambda pos: self.show_context_menu(pos, "raspberry", self.obj6)
+            lambda pos: self.show_context_menu(pos, "blueberry", self.obj6)
         )
 
         self.map_label = QLabel()
