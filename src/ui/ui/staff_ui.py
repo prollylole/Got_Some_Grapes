@@ -27,13 +27,13 @@ class StaffGUI(QWidget):
 
         # ---------------- TELEMETRY LABELS ----------------
         self.route_lbl = QLabel("Active Route: --")
-        self.distance_lbl = QLabel("Total Distance: --")
+        self.distance_lbl = QLabel("Progress Bar: ")
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
-        self.progress_bar.setTextVisible(True)
+        self.progress_bar.setTextVisible(False)
         self.update_progress_signal.connect(self.progress_bar.setValue)
-        self.update_distance_signal.connect(self.distance_lbl.setText)
+        # self.update_distance_signal.connect(self.distance_lbl.setText)
         self.update_route_signal.connect(self.route_lbl.setText)
 
         # ---------------- MODE BUTTONS ----------------
