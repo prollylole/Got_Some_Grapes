@@ -125,7 +125,6 @@ class GUI(QWidget):
 
         left_layout.setSpacing(4)
         left_layout.setContentsMargins(2, 2, 2, 2)
-        left_layout.addStretch(1)
         main_layout.setVerticalSpacing(6)
 
         main_layout.addLayout(left_layout, 0, 0)
@@ -161,15 +160,19 @@ class GUI(QWidget):
             padding: 5px;
         """)
 
-        self.cart_container = QVBoxLayout()
-        self.cart_container.addWidget(self.cart_frame)
+        # place cart under the progress bar in the left column
+        left_layout.addWidget(self.cart_frame)
+        left_layout.addStretch(1)
 
         # ---------------- FINAL CONTAINER ----------------
         container = QVBoxLayout()
         container.addLayout(main_layout)
-        container.addLayout(self.cart_container)
         container.addStretch()
         container.addLayout(bottom_layout)
+
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+
+        self.setLayout(container)
 
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
 
