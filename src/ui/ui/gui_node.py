@@ -1,6 +1,7 @@
 import math
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy
+from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
 
 import numpy as np
 import cv2
@@ -57,7 +58,7 @@ class GuiNode(Node):
 
         self.create_subscription(OccupancyGrid, '/map', self.map_callback, 10)
         self.create_subscription(Path, '/plan', self.path_callback, 10)
-        self.create_subscription(PoseStamped, '/amcl_pose', self.robot_pose_callback, 10)
+        self.create_subscription(PoseWithCovarianceStamped, '/amcl_pose', self.robot_pose_callback, 10)
         self.create_subscription(PoseStamped, '/goal_pose', self.goal_callback, 10)
 
     # ---------------- CONTROL ----------------
@@ -325,20 +326,20 @@ class GuiNode(Node):
                     cv2.circle(img, point, 2, (0, 0, 255), -1)
 
         if self.robot_pose is not None:
-            x = self.robot_pose.pose.position.x
-            y = self.robot_pose.pose.position.y
+            x = self.robot_pose.pose.pose.position.x
+            y = self.robot_pose.pose.pose.position.y
             px, py = self.world_to_pixel(x, y, origin, resolution, width, height)
             if 0 <= px < width and 0 <= py < height:
-                cv2.circle(img, (px, py), 4, (0, 255, 0), -1)
-                cv2.circle(img, (px, py), 6, (255, 255, 255), 1)
+                cv2.circle(img, (px, py), 3, (0, 255, 0), -1)
+                cv2.circle(img, (px, py), 5, (255, 255, 255), 1)
 
         if self.goal_pose is not None:
             x = self.goal_pose.pose.position.x
             y = self.goal_pose.pose.position.y
             px, py = self.world_to_pixel(x, y, origin, resolution, width, height)
             if 0 <= px < width and 0 <= py < height:
-                cv2.circle(img, (px, py), 6, (255, 0, 0), -1)
-                cv2.circle(img, (px, py), 8, (255, 255, 255), 1)
+                cv2.circle(img, (px, py), 3, (255, 0, 0), -1)
+                cv2.circle(img, (px, py), 5, (255, 255, 255), 1)
 
         # rotate 90 degrees
         img = cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE)
