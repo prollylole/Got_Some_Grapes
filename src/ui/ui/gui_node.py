@@ -85,7 +85,7 @@ class GuiNode(Node):
     # ---------------- STATUS ----------------
     def status_callback(self, msg):
         self.ui.status.setText(f"Status: {msg.data}")
-        if "Mission Complete" in msg.data:
+        if "Mission complete" in msg.data:
             self.clear_cart()
 
     # ---------------- TELEMETRY ----------------
@@ -146,17 +146,11 @@ class GuiNode(Node):
 
     # ---------------- OBJECT SELECTION ----------------
     def choose_object(self, obj_name, button):
-        demand_text = self.ui.demand_combo.currentText()
-
-        demand_level = demand_text.split()[-1]
-
-        formatted_name = f"{obj_name}:{demand_level}"
-
-        # ensure we don't add the exact same object and priority combo twice
-        if formatted_name in self.selected_objects:
+        # ensure we don't add the exact same object twice
+        if obj_name in self.selected_objects:
             return
         
-        self.selected_objects.append(formatted_name)
+        self.selected_objects.append(obj_name)
         self.update_cart_display()
 
         msg = String()
@@ -197,12 +191,8 @@ class GuiNode(Node):
             self.ui.cart_items_layout.addWidget(label)
             return
 
-        # select demand level
         for obj in self.selected_objects:
-            parts = obj.split(':')
-            display_name = parts[0].capitalize()
-            if len(parts) == 2:
-                display_name += f" (D:{parts[1]})"
+            display_name = obj.capitalize()
                 
             label = QLabel(display_name)
             label.setStyleSheet(
@@ -342,7 +332,7 @@ class GuiNode(Node):
                 cv2.circle(img, (px, py), 5, (255, 255, 255), 1)
 
         # rotate 90 degrees
-        img = cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE)
+        # img = cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE)
         img = cv2.flip(img, 1)
         # zoom out slightly by drawing the resized map on a smaller centered canvas
         display_w, display_h = 420, 200

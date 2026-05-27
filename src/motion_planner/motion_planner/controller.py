@@ -155,24 +155,24 @@ class Controller(Node):
 
         # another_mock_supermarket
         # fix 90 degree turns 
-        # self.item_waypoints = {
-        #     'banana': create_pose(1.38, -11.6, 0.0),
-        #     'bottle': create_pose(-1.98, -11.2, -1.57),
-        #     'book': create_pose(-4.12, -8.81, 1.57),
-        #     'cup': create_pose(-7.1, -11.3, -1.57),
-        #     'apple': create_pose(-9.28, -8.6, 1.57),
-        #     'blueberry': create_pose(-10.7, -10.5, 3.14159)
-        # }
+        self.item_waypoints = {
+            'banana': create_pose(1.38, -11.6, 0.0),
+            'bottle': create_pose(-1.98, -11.2, -1.57),
+            'book': create_pose(-4.12, -8.81, 1.57),
+            'cup': create_pose(-7.1, -11.3, -1.57),
+            'apple': create_pose(-9.28, -8.6, 1.57),
+            'blueberry': create_pose(-10.7, -10.5, 3.14159)
+        }
 
         #Harrsha waypoints
-        self.item_waypoints = {
-            'apple': create_pose(-1.59, 1.60),
-            'bottle': create_pose(0.58, -7.47),
-            'book': create_pose(0.25, 5.29),
-            'cup': create_pose(1.11, -0.41),
-            'banana': create_pose(2.35, 3.35),
-            'blueberry': create_pose(-1.60, -6.71)
-        }
+        # self.item_waypoints = {
+        #     'apple': create_pose(-1.59, 1.60),
+        #     'bottle': create_pose(0.58, -7.47),
+        #     'book': create_pose(0.25, 5.29),
+        #     'cup': create_pose(1.11, -0.41),
+        #     'banana': create_pose(2.35, 3.35),
+        #     'blueberry': create_pose(-1.60, -6.71)
+        # }
 
         # 3rd supermarket
         # self.item_waypoints = {
@@ -558,30 +558,20 @@ class Controller(Node):
         self.pending_items.clear()
         items_str = msg.data.split(',') if msg.data else []
 
-        # name : demand level
+        # parse item names
         for item_str in items_str:
             if not item_str: continue
-            parts = item_str.split(':')
-            if len(parts) == 2:
-                name = parts[0].strip().lower()
+            name = item_str.strip().lower()
 
-                # demand mapping
-                d_level = parts[1]
-                demand_val = 0
-                if d_level == '1' : demand_val = 15
-                elif d_level == '2' : demand_val = 10
-                elif d_level == '3' : demand_val = 5
-
-                if name in self.item_waypoints:
-                    self.pending_items.append({
-                        'name': name,
-                        'pose': self.item_waypoints[name],
-                        'demand': demand_val,
-                        'upsell': 0
-                    })
-
-                else:
-                    self.get_logger().warn(f"Unknown item selected: {name}")
+            if name in self.item_waypoints:
+                self.pending_items.append({
+                    'name': name,
+                    'pose': self.item_waypoints[name],
+                    'demand': 0,
+                    'upsell': 0
+                })
+            else:
+                self.get_logger().warn(f"Unknown item selected: {name}")
 
         # Update the active mission array
         self.process_waypoints([], "map")
@@ -914,6 +904,10 @@ class Controller(Node):
             self.robot_run_pub.publish(run_msg)
             
             self.publish_status("Mission completed! Heading to checkout.")
+            
+            route_msg = String()
+            route_msg.data = "--"
+            self.active_route_pub.publish(route_msg)
             return
         
         # trigger async route recalculation

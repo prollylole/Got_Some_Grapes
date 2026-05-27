@@ -204,7 +204,7 @@ class StaffNode(Node):
                 cv2.circle(img, (px, py), 8, (255, 255, 255), 1)
 
         # rotate 90 degrees
-        img = cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE)
+        # img = cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE)
         img = cv2.flip(img, 1)
         # zoom out slightly by drawing the resized map on a smaller centered canvas
         display_w, display_h = 420, 200
