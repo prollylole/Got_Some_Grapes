@@ -4,6 +4,9 @@ from PyQt6.QtWidgets import (
     QHBoxLayout, QMenu, QProgressBar
 )
 from PyQt6.QtWidgets import QComboBox
+from PyQt6.QtGui import QPixmap
+from PyQt6.QtWidgets import QSizePolicy
+
 
 class StaffGUI(QWidget):
     add_stock_item_signal = pyqtSignal(str)
@@ -20,7 +23,7 @@ class StaffGUI(QWidget):
         self.out_of_stock_items = set()
 
         self.setWindowTitle("Staff Control Panel")
-        self.setFixedSize(700, 600)
+        self.setFixedSize(700, 705)
 
         # ---------------- STATUS ----------------
         self.status = QLabel("Status: STOPPED")
@@ -37,7 +40,7 @@ class StaffGUI(QWidget):
         self.update_route_signal.connect(self.route_lbl.setText)
 
         # ---------------- MODE BUTTONS ----------------
-        self.mode_label = QLabel("Mode")
+        self.mode_label = QLabel("Please Select the Mode")
 
         self.normal_btn = QPushButton("Normal")
         self.upsell_btn = QPushButton("Upsell")
@@ -54,27 +57,14 @@ class StaffGUI(QWidget):
         mode_layout.addWidget(self.upsell_btn)
 
         # ---------------- CAMERA SECTION ----------------
-        self.camera_frame = QWidget()
-        self.camera_layout = QVBoxLayout()
-        self.camera_layout.setSpacing(5)
-
-        self.camera_label = QLabel("Robot Camera Feed")
-        self.camera_label.setStyleSheet(
-            "font-size:14px; font-weight:bold; background: none; "
-            "border: none; padding: 0; margin: 0;"
-        )
-
         self.camera_feed = QLabel("No camera feed")
-        self.camera_feed.setFixedHeight(200)
+        self.camera_feed.setFixedSize(450, 180)
 
-        self.camera_layout.addWidget(self.camera_label)
-        self.camera_layout.addWidget(self.camera_feed)
+        self.camera_feed.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
-        self.camera_frame.setLayout(self.camera_layout)
-        self.camera_frame.setStyleSheet("""
-            border: 1px solid #888;
-            border-radius: 5px;
-            padding: 5px;
+        self.camera_feed.setStyleSheet("""
+            border: 2px solid #888;
+            background-color: black;
         """)
 
         # ---------------- OUT OF STOCK LIST (LIKE CART) ----------------
@@ -96,12 +86,24 @@ class StaffGUI(QWidget):
         self.stock_layout.addStretch()
 
         self.stock_frame.setLayout(self.stock_layout)
-        self.stock_frame.setFixedWidth(200)
+        self.stock_frame.setFixedWidth(180)
+        self.stock_frame.setFixedHeight(200)
+
         self.stock_frame.setStyleSheet("""
             border: 1px solid #888;
             border-radius: 5px;
             padding: 5px;
         """)
+
+        #map label
+        self.map_label = QLabel()
+        self.map_label.setFixedSize(450, 180)
+        self.map_label.setStyleSheet("""
+            border: 2px solid #888;
+            background-color: black;
+        """)
+        self.map_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.map_label.setText("Nav2 Map View")
 
         #dropdown for upsell products
         self.upsell_label = QLabel("Select Promotion Item")
@@ -115,7 +117,7 @@ class StaffGUI(QWidget):
 
         # ---------------- TOP SECTION ----------------
         top_layout = QHBoxLayout()
-        top_layout.addWidget(self.camera_frame)
+        top_layout.addWidget(self.camera_feed, Qt.AlignmentFlag.AlignLeft)
         top_layout.addWidget(self.stock_frame)
 
         # ---------------- START/STOP BUTTONS ----------------
@@ -142,7 +144,8 @@ class StaffGUI(QWidget):
         main_layout.addWidget(self.distance_lbl)
         main_layout.addWidget(self.progress_bar)
         main_layout.addLayout(top_layout)
-        main_layout.addStretch()
+        # main_layout.addStretch()
+        main_layout.addWidget(self.map_label, alignment=Qt.AlignmentFlag.AlignLeft)
         main_layout.addLayout(control_layout)
 
         self.setLayout(main_layout)
