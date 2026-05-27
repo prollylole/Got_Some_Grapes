@@ -49,6 +49,8 @@ class StaffNode(Node):
     # ---------------- STATUS ----------------
     def status_callback(self, msg):
         self.ui.status.setText(f"Status: {msg.data}")
+        if msg.data == "Mission completed! Heading to the checkout now.":
+            self.ui.reset_upsell_signal.emit()
 
     # ---------------- TELEMETRY ----------------
     def progress_callback(self, msg):

@@ -275,6 +275,11 @@ class Controller(Node):
 
         self.get_logger().info("Turtlebot3 controller node started")
 
+    def publish_status(self, msg_str: str):
+        status_msg = String()
+        status_msg.data = msg_str
+        self.status_pub.publish(status_msg)
+
     def timer_callback(self):
         self.publish_goal_markers()
         self.publish_telemetry()
@@ -408,6 +413,7 @@ class Controller(Node):
             
             self.rotate_to_yaw(target_yaw)
             
+            self.publish_status(f"Scanning for {item_name} availability...")
             self.get_logger().info(f"Scanning for item: {item_name}")
 
             expected_colour = self.object_to_colour.get(item_name)
@@ -466,6 +472,11 @@ class Controller(Node):
             msg.data = False
             self.continue_pub.publish(msg)
             
+            if item_name == self.current_upsell_product:
+                self.publish_status(f"{item_name} is on sale!")
+            else:
+                self.publish_status("Press next item to continue")
+                
     def publish_item_out_of_stock(self, item_name):
         msg = Bool()
         msg.data = False
@@ -866,6 +877,7 @@ class Controller(Node):
                 self.dispatch_goal()
             else:
                 self.get_logger().info(f"Waypoints loaded (Mode: {self.mode}). Waiting for UI Start button to begin")
+                self.publish_status("Press start to move")
 
     def process_waypoints(self, poses, frame="map"):
         if not self.pending_items:
@@ -895,14 +907,13 @@ class Controller(Node):
             self.get_logger().info("All waypoints completed successfully!")
             self.goal_set = False
             self.is_running = False
+            self.current_upsell_product = None  # Reset upsell for next mission
             
             run_msg = Bool()
             run_msg.data = False
             self.robot_run_pub.publish(run_msg)
             
-            status_msg = String()
-            status_msg.data = "Mission Complete."
-            self.status_pub.publish(status_msg)
+            self.publish_status("Mission completed! Heading to checkout.")
             return
         
         # trigger async route recalculation
@@ -918,6 +929,7 @@ class Controller(Node):
 
         current_target = self.pending_items[self.current_goal_idx]
         self.get_logger().info(f"Dynamic Route: Selected '{current_target['name']}' as next target.")
+        self.publish_status(f"Moving to {current_target['name']}...")
 
         goal_msg = NavigateToPose.Goal()
         fresh_pose = self.waypoints[self.current_goal_idx]
