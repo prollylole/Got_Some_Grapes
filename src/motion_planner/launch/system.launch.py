@@ -66,7 +66,7 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
-        world_launch,
+        # world_launch,
         # nav2_launch,
         controller_node,
         perception_node,

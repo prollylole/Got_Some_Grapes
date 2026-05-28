@@ -22,6 +22,7 @@ from std_msgs.msg import Bool, String
 from nav2_msgs.action import NavigateToPose, ComputePathToPose
 from perception_interfaces.srv import DetectColour
 from tf2_ros import Buffer, TransformListener
+from rclpy.qos import qos_profile_sensor_data    
 
 import cv_bridge
 
@@ -155,14 +156,14 @@ class Controller(Node):
 
         # another_mock_supermarket
         # fix 90 degree turns 
-        self.item_waypoints = {
-            'banana': create_pose(1.38, -11.6, 0.0),
-            'bottle': create_pose(-1.98, -11.2, -1.57),
-            'book': create_pose(-4.12, -8.81, 1.57),
-            'cup': create_pose(-7.1, -11.3, -1.57),
-            'apple': create_pose(-9.28, -8.6, 1.57),
-            'blueberry': create_pose(-10.7, -10.5, 3.14159)
-        }
+        # self.item_waypoints = {
+        #     'banana': create_pose(1.38, -11.6, 0.0),
+        #     'bottle': create_pose(-1.98, -11.2, -1.57),
+        #     'book': create_pose(-4.12, -8.81, 1.57),
+        #     'cup': create_pose(-7.1, -11.3, -1.57),
+        #     'apple': create_pose(-9.28, -8.6, 1.57),
+        #     'blueberry': create_pose(-10.7, -10.5, 3.14159)
+        # }
 
         #Harrsha waypoints
         # self.item_waypoints = {
@@ -183,25 +184,24 @@ class Controller(Node):
         #     'apple': create_pose(0.592, 1.57, -3.14159),
         #     'raspberry': create_pose(-0.428, 0.611, -1.57)
         # }
-        # fix 90 degree turns
+        # fix 180 degree turns
         # self.item_waypoints = {
-        #     'banana': create_pose(6.23, -1.17, 0.0),
-        #     'bottle': create_pose(4.53, -0.182, -1.57),
-        #     'book': create_pose(3.24, 1.18, 1.57),
-        #     'cup': create_pose(1.62, 0.197, -1.57),
-        #     'apple': create_pose(0.592, 1.57, 1.57),
-        #     'raspberry': create_pose(-0.428, 0.611, 3.14159)
+        #     'banana': create_pose(0.27, -0.384, 1.57),
+        #     'bottle': create_pose(0.353, 1.89, 0.0),
+        #     'book': create_pose(1.01, 3.17, -3.14159),
+        #     'cup': create_pose(-0.1, 4.45, 0.0),
+        #     'apple': create_pose(0.78, 4.96, -3.14159),
+        #     'blueberry': create_pose(-0.3, 6.37, -1.57)
         # }
 
-        # small space waypoints
-        # self.item_waypoints = {
-        #     'banana': create_pose(6.23, -1.17, 0.0),
-        #     'bottle': create_pose(4.53, -0.182, -1.57),
-        #     'book': create_pose(1.6, 0.4, 1.57),
-        #     'cup': create_pose(1.62, 0.197, -1.57),
-        #     'apple': create_pose(1.68, 1.28, 1.57),
-        #     'raspberry': create_pose(-0.428, 0.611, 3.14159)
-        # }
+        self.item_waypoints = {
+            'banana': create_pose(0.27, -0.384, -1.57),
+            'bottle': create_pose(0.353, 1.89, 3.14159),
+            'book': create_pose(1.01, 3.17, 3.14159),
+            'cup': create_pose(-0.1, 4.45, 3.14159),
+            'apple': create_pose(0.78, 4.96, 3.14159),
+            'blueberry': create_pose(-0.3, 6.37, 1.57)
+        }
 
 
         self.status_pub = self.create_publisher(
@@ -328,13 +328,13 @@ class Controller(Node):
                 # if time difference is greater than 5s, robot is stuck
                 else:
                     dt = (now - self.stuck_anchor_time).nanoseconds / 1e9
-                    if dt > 5.0:
+                    if dt > 45.0:
                         is_stuck = True
         
         # if within 0.3m or stuck for > 15s 
         if (dist < 0.3 or is_stuck) and not self.waiting_for_continue and not self.checking_item:
             if is_stuck:
-                self.get_logger().info(f"Robot stuck near goal for >15s (dist: {dist:.2f}m). Starting automated item check.")
+                self.get_logger().info(f"Robot stuck near goal for >45s (dist: {dist:.2f}m). Starting automated item check.")
             else:
                 self.get_logger().info(f"Waypoint {self.current_goal_idx + 1} reached! Starting automated item check.")
 
