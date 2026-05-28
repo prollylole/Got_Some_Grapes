@@ -65,7 +65,7 @@ class Controller(Node):
             LaserScan,
             '/scan',
             self.laser_callback,
-            10
+            qos_profile_sensor_data
         )
 
         # self.single_goal_sub = self.create_subscription(
